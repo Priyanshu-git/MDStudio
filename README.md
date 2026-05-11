@@ -23,6 +23,12 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 - `npm run format` - check formatting with Prettier
 - `npm run format:write` - apply formatting with Prettier
 
+## Offline & PWA
+
+Markdown Studio is a Progressive Web App (PWA) that works offline. It uses a service worker to cache assets and IndexedDB for local document storage.
+
+For more details, see [Offline Support](docs/OFFLINE.md).
+
 ## Scope Boundaries (MVP)
 
 In scope:

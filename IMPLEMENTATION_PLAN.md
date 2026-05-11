@@ -179,7 +179,7 @@ This plan is decision-complete and includes:
 
 ---
 
-## Phase 6: PWA and Offline Hardening
+## Phase 6: PWA and Offline Hardening - Completed
 
 ### Objectives
 - Deliver installable offline-capable MVP.
@@ -192,9 +192,10 @@ This plan is decision-complete and includes:
    - local docs still editable offline
 4. Document known offline limitations.
 
-### Acceptance Criteria
+### Acceptance Criteria Status
 - App is installable as PWA.
 - Offline open/edit/save flow works with IndexedDB data.
+- Offline documentation added (`docs/OFFLINE.md`).
 
 ---
 
