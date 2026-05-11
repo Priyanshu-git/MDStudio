@@ -1,3 +1,4 @@
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -13,7 +14,10 @@ type MarkdownPreviewProps = {
   theme: ThemeName
 }
 
-export function MarkdownPreview({ markdown, theme }: MarkdownPreviewProps) {
+export const MarkdownPreview = React.memo(function MarkdownPreview({
+  markdown,
+  theme,
+}: MarkdownPreviewProps) {
   return (
     <article className={`markdown-doc markdown-doc-${theme}`}>
       <ReactMarkdown
@@ -44,4 +48,4 @@ export function MarkdownPreview({ markdown, theme }: MarkdownPreviewProps) {
       </ReactMarkdown>
     </article>
   )
-}
+})

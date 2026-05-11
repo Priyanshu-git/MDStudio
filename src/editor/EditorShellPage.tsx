@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useDeferredValue } from 'react'
 import { AppShellLayout } from '../components/layout/AppShellLayout'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore } from '../state/useAppStore'
@@ -15,6 +15,8 @@ export function EditorShellPage() {
   const hydrateDocument = useAppStore((state) => state.hydrateDocument)
   const persistDraft = useAppStore((state) => state.persistDraft)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+
+  const deferredMarkdown = useDeferredValue(draftMarkdown)
 
   useEffect(() => {
     void hydrateDocument()
@@ -89,7 +91,7 @@ export function EditorShellPage() {
             <article className="panel">
               <div className="placeholder-surface">
                 <h2>Preview</h2>
-                <MarkdownPreview markdown={draftMarkdown} theme={theme} />
+                <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
               </div>
             </article>
           </section>
@@ -105,14 +107,14 @@ export function EditorShellPage() {
                   aria-label="Markdown input mobile"
                 />
               ) : (
-                <MarkdownPreview markdown={draftMarkdown} theme={theme} />
+                <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
               )}
             </div>
           </section>
         </>
       ) : (
         <section className="docs-mode-panel">
-          <MarkdownPreview markdown={draftMarkdown} theme={theme} />
+          <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
         </section>
       )}
     </AppShellLayout>

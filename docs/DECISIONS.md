@@ -24,3 +24,8 @@
 - **Status:** Accepted
 - **Decision:** `/editor` provides an explicit read-only Documentation View toggle that hides edit controls and shows a full-page rendered markdown document.
 - **Rationale:** Improves reading flow for long-form markdown and separates authoring from consumption.
+
+## ADR-006: Performance and Bundle Optimization
+- **Status:** Accepted
+- **Decision:** Use dynamic imports for heavy libraries (Mermaid, Shiki), memoize core rendering surfaces, and utilize `useDeferredValue` for markdown preview updates.
+- **Rationale:** Ensures small initial bundle size, maintains editor responsiveness during heavy rendering tasks, and avoids unnecessary re-renders in complex layouts.

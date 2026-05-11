@@ -199,7 +199,7 @@ This plan is decision-complete and includes:
 
 ---
 
-## Phase 7: Quality, Performance, and Release Hardening
+## Phase 7: Quality, Performance, and Release Hardening - Completed
 
 ### Objectives
 - Ship release-ready MVP with measurable confidence.
@@ -211,8 +211,8 @@ This plan is decision-complete and includes:
    - docs mode regressions
 2. Add E2E coverage for key journeys.
 3. Performance pass:
-   - lazy load heavy modules
-   - reduce unnecessary rerenders
+   - lazy load heavy modules (Shiki, Mermaid)
+   - reduce unnecessary rerenders (memoization, `useDeferredValue`)
    - monitor bundle size thresholds
 4. Final docs sync:
    - architecture
@@ -220,9 +220,10 @@ This plan is decision-complete and includes:
    - roadmap
    - known constraints
 
-### Acceptance Criteria
+### Acceptance Criteria Status
 - CI checks green (lint/typecheck/test/build).
-- Critical user journeys verified.
+- Critical user journeys verified (see `src/test/UserJourneys.test.tsx`).
+- Performance optimizations applied (ADR-006).
 - Docs and behavior fully aligned.
 
 ---

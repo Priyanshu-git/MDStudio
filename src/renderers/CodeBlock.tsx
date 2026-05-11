@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { codeToHtml } from 'shiki'
 import type { ThemeName } from '../types'
 
 type CodeBlockProps = {
@@ -32,6 +31,7 @@ export function CodeBlock({
 
     async function runHighlight() {
       try {
+        const { codeToHtml } = await import('shiki')
         const html = await codeToHtml(code, {
           lang: normalizedLanguage,
           theme:
