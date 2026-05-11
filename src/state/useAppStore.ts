@@ -33,7 +33,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: 'github-light',
   mobileTab: 'edit',
   editorMode: 'edit',
-  draftMarkdown: '# Welcome to Markdown Studio\n\nPhase 2 shell is ready.',
+  draftMarkdown: `# Welcome to Markdown Studio
+
+Markdown Studio is a local-first editor.
+
+| Feature | Status | Priority |
+| :--- | :---: | ---: |
+| Markdown Rendering | ✅ | High |
+| Mermaid Diagrams | ✅ | High |
+| Shiki Highlighting | ✅ | Medium |
+| Local Persistence | ✅ | High |
+| PWA / Offline | ✅ | High |
+
+Phase 2 shell is ready.`,
   setActiveDocId: (docId) => {
     set({ activeDocId: docId })
     if (docId) {

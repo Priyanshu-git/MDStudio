@@ -59,4 +59,13 @@ describe('MarkdownPreview', () => {
     const diagram = await screen.findByText('Diagram')
     expect(diagram).toBeInTheDocument()
   })
+
+  it('renders tables correctly', () => {
+    const markdown = '| Col 1 | Col 2 |\n| --- | --- |\n| Val 1 | Val 2 |'
+    render(<MarkdownPreview markdown={markdown} theme="github-light" />)
+
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Col 1' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Val 1' })).toBeInTheDocument()
+  })
 })
