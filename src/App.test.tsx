@@ -1,9 +1,21 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { getSharedDocumentById, publishSharedDocument } from './storage/shareDocuments'
+
+vi.mock('./storage/shareDocuments', () => ({
+  publishSharedDocument: vi.fn(),
+  getSharedDocumentById: vi.fn(),
+}))
 
 describe('App routing shell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(publishSharedDocument).mockResolvedValue({ shareId: 'share-id' })
+    vi.mocked(getSharedDocumentById).mockResolvedValue(null)
+  })
+
   it('redirects root to editor shell', () => {
     window.history.pushState({}, '', '/')
     render(
@@ -51,14 +63,18 @@ describe('App routing shell', () => {
     expect(screen.getByText('test-doc')).toBeInTheDocument()
   })
 
-  it('renders share route placeholder', () => {
+  it('renders share route missing state', async () => {
     window.history.pushState({}, '', '/share/public-123')
     render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
-    expect(screen.getByText('Share Route')).toBeInTheDocument()
-    expect(screen.getByText('public-123')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Shared document not found.')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Shared Document')).toBeInTheDocument()
+    expect(screen.getByText('Share ID: public-123')).toBeInTheDocument()
   })
 })

@@ -14,3 +14,11 @@ export type Document = {
   updatedAt: number
   theme?: ThemeName
 }
+
+export type SharedDocument = {
+  id: string
+  markdown: string
+  createdAt: number
+  updatedAt: number
+  sourceDocId?: string
+}

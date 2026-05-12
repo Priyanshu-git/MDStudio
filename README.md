@@ -29,6 +29,12 @@ Markdown Studio is a Progressive Web App (PWA) that works offline. It uses a ser
 
 For more details, see [Offline Support](docs/OFFLINE.md).
 
+## Firestore Sharing MVP
+
+Firestore powers manual sharing via `/share/:id` while the editor remains local-first with IndexedDB.
+
+See [Firebase Firestore Setup](docs/FIREBASE.md) for collection shape and MVP security rules.
+
 ## Scope Boundaries (MVP)
 
 In scope:

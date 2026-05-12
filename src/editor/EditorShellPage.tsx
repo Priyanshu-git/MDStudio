@@ -1,7 +1,8 @@
-import { useEffect, useDeferredValue } from 'react'
+import { useEffect, useDeferredValue, useState } from 'react'
 import { AppShellLayout } from '../components/layout/AppShellLayout'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore } from '../state/useAppStore'
+import { publishSharedDocument } from '../storage/shareDocuments'
 
 export function EditorShellPage() {
   const mobileTab = useAppStore((state) => state.mobileTab)
@@ -15,6 +16,11 @@ export function EditorShellPage() {
   const hydrateDocument = useAppStore((state) => state.hydrateDocument)
   const persistDraft = useAppStore((state) => state.persistDraft)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+  const activeDocId = useAppStore((state) => state.activeDocId)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState<string | null>(null)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   const deferredMarkdown = useDeferredValue(draftMarkdown)
 
@@ -31,6 +37,42 @@ export function EditorShellPage() {
     }, 700)
     return () => window.clearTimeout(timeout)
   }, [draftMarkdown, isHydrated, persistDraft])
+
+  async function handlePublish() {
+    setPublishError(null)
+    setCopyState('idle')
+    setIsPublishing(true)
+
+    try {
+      const result = await publishSharedDocument({
+        markdown: draftMarkdown,
+        sourceDocId: activeDocId ?? undefined,
+      })
+      const path = `/share/${result.shareId}`
+      const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
+      setShareUrl(url)
+    } catch {
+      setPublishError('Unable to publish right now. Please try again.')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  async function handleCopyShareUrl() {
+    if (!shareUrl) {
+      return
+    }
+    if (!navigator.clipboard) {
+      setCopyState('failed')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopyState('copied')
+    } catch {
+      setCopyState('failed')
+    }
+  }
 
   return (
     <AppShellLayout
@@ -51,6 +93,9 @@ export function EditorShellPage() {
               <option value="cherry-blossom">Cherry Blossom</option>
             </select>
           </label>
+          <button type="button" className="primary-button" onClick={() => void handlePublish()} disabled={isPublishing}>
+            {isPublishing ? 'Publishing...' : 'Publish'}
+          </button>
           <button
             type="button"
             className="primary-button"
@@ -61,6 +106,23 @@ export function EditorShellPage() {
         </div>
       }
     >
+      {publishError ? (
+        <section className="publish-banner publish-banner-error" role="status">
+          {publishError}
+        </section>
+      ) : null}
+      {shareUrl ? (
+        <section className="publish-banner" role="status">
+          <span>
+            Shared link: <a href={shareUrl}>{shareUrl}</a>
+          </span>
+          <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
+            Copy Link
+          </button>
+          {copyState === 'copied' ? <span>Copied</span> : null}
+          {copyState === 'failed' ? <span>Copy failed</span> : null}
+        </section>
+      ) : null}
       {editorMode === 'edit' ? (
         <>
           <div className="mobile-tabs">
