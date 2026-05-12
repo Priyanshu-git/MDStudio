@@ -6,7 +6,7 @@ Markdown Studio is a local-first, CSR-only markdown editor focused on accurate r
 
 This plan is decision-complete and includes:
 - implemented foundation and core product work (Phases 0-5),
-- remaining implementation phases (6-7),
+- completed implementation phases (6-7),
 - interfaces/contracts,
 - test strategy,
 - guardrail-driven execution rules.
@@ -85,7 +85,7 @@ This plan is decision-complete and includes:
 - Note: cursor and scroll persistence are deferred to a follow-up in Phase 5 hardening.
 
 ### Phase 5 (Completed)
-- Theme system implemented with eight themes:
+- Theme system implemented with seven themes:
   - `github-light`
   - `dracula`
   - `lavender-fields`
