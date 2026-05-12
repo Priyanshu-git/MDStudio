@@ -85,10 +85,14 @@ This plan is decision-complete and includes:
 - Note: cursor and scroll persistence are deferred to a follow-up in Phase 5 hardening.
 
 ### Phase 5 (Completed)
-- Theme system implemented with three required themes:
+- Theme system implemented with eight themes:
   - `github-light`
   - `dracula`
-  - `nord`
+  - `lavender-fields`
+  - `blue-eclipse`
+  - `lush-forest`
+  - `ink-wash`
+  - `cherry-blossom`
 - Theme selection control added to editor topbar.
 - Theme preference persistence added via app state storage.
 - Theme application now affects:
@@ -233,7 +237,14 @@ This plan is decision-complete and includes:
 ## Domain Types
 
 ```ts
-type ThemeName = 'github-light' | 'dracula' | 'nord'
+type ThemeName =
+  | 'github-light'
+  | 'dracula'
+  | 'lavender-fields'
+  | 'blue-eclipse'
+  | 'lush-forest'
+  | 'ink-wash'
+  | 'cherry-blossom'
 
 type Document = {
   id: string

@@ -10,7 +10,11 @@ Application-wide theme with coordinated behavior across:
 ## Required Theme Set
 - `github-light`
 - `dracula`
-- `nord`
+- `lavender-fields`
+- `blue-eclipse`
+- `lush-forest`
+- `ink-wash`
+- `cherry-blossom`
 
 ## Rules
 - Theme changes must propagate consistently to all surfaces.

@@ -1,4 +1,11 @@
-export type ThemeName = 'github-light' | 'dracula' | 'nord'
+export type ThemeName =
+  | 'github-light'
+  | 'dracula'
+  | 'lavender-fields'
+  | 'blue-eclipse'
+  | 'lush-forest'
+  | 'ink-wash'
+  | 'cherry-blossom'
 
 export type Document = {
   id: string

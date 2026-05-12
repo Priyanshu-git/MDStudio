@@ -359,7 +359,11 @@ Required:
 
 - GitHub Light
 - Dracula
-- Nord
+- Lavender Fields
+- Blue Eclipse
+- Lush Forest
+- Ink Wash
+- Cherry Blossom
 
 ---
 

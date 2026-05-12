@@ -44,7 +44,11 @@ export function EditorShellPage() {
             <select value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
               <option value="github-light">GitHub Light</option>
               <option value="dracula">Dracula</option>
-              <option value="nord">Nord</option>
+              <option value="lavender-fields">Lavender Fields</option>
+              <option value="blue-eclipse">Blue Eclipse</option>
+              <option value="lush-forest">Lush Forest</option>
+              <option value="ink-wash">Ink Wash</option>
+              <option value="cherry-blossom">Cherry Blossom</option>
             </select>
           </label>
           <button

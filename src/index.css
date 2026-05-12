@@ -25,13 +25,51 @@ html[data-theme="dracula"] {
   --soft: #343746;
 }
 
-html[data-theme="nord"] {
-  --bg: #2e3440;
-  --text: #eceff4;
-  --surface: #3b4252;
-  --border: #4c566a;
-  --muted: #88c0d0;
-  --soft: #434c5e;
+html[data-theme="lavender-fields"] {
+  --bg: #fdfbd4;
+  --text: #4a482c;
+  --surface: #ffffff;
+  --border: #c1bfff;
+  --muted: #cf6dfc;
+  --soft: #e6e4ff;
+}
+
+html[data-theme="blue-eclipse"] {
+  --bg: #0f0e47;
+  --text: #d1d1e0;
+  --surface: #272757;
+  --border: #505081;
+  --muted: #8686ac;
+  --soft: #1a1a3d;
+}
+
+html[data-theme="lush-forest"] {
+  --bg: #cfffdc;
+  --text: #253d2c;
+  --surface: #ffffff;
+  --border: #68ba7f;
+  --muted: #2e6f40;
+  --soft: #e8fff0;
+}
+
+html[data-theme="ink-wash"] {
+  --bg: #f3efe6;
+  --text: #2f2b28;
+  --surface: #faf7f0;
+  --border: #d7d0c2;
+  --muted: #7a8794;
+  --soft: #e7dfd1;
+  --accent: #5c748a;
+}
+
+html[data-theme="cherry-blossom"] {
+  --bg: #fcf6f6;
+  --text: #4f4242;
+  --surface: #fffdfc;
+  --border: #e8d2d2;
+  --muted: #dca2b0;
+  --soft: #e3efe4;
+  --accent: #c9788d;
 }
 
 body {
@@ -152,7 +190,7 @@ select {
 
 .editor-input {
   width: 100%;
-  min-height: 280px;
+  height: 75vh;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);

@@ -32,14 +32,13 @@ export function CodeBlock({
     async function runHighlight() {
       try {
         const { codeToHtml } = await import('shiki')
+        const shikiTheme =
+          theme === 'dracula' || theme === 'blue-eclipse'
+            ? 'dracula'
+            : 'github-light'
         const html = await codeToHtml(code, {
           lang: normalizedLanguage,
-          theme:
-            theme === 'dracula'
-              ? 'dracula'
-              : theme === 'nord'
-                ? 'nord'
-                : 'github-light',
+          theme: shikiTheme,
         })
         if (!cancelled) {
           setHighlighted(html)

@@ -17,7 +17,14 @@ type Document = {
 ## ThemeName
 
 ```ts
-type ThemeName = 'github-light' | 'dracula' | 'nord'
+type ThemeName =
+  | 'github-light'
+  | 'dracula'
+  | 'lavender-fields'
+  | 'blue-eclipse'
+  | 'lush-forest'
+  | 'ink-wash'
+  | 'cherry-blossom'
 ```
 
 ## Invariants

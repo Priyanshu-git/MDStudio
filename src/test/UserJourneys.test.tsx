@@ -49,8 +49,8 @@ describe('User Journeys', () => {
     expect(screen.getByText('Back to Edit')).toBeInTheDocument()
 
     // 5. Change theme
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'nord' } })
-    expect(document.documentElement.dataset.theme).toBe('nord')
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'lavender-fields' } })
+    expect(document.documentElement.dataset.theme).toBe('lavender-fields')
 
     // 6. Simulate reload by unmounting and remounting
     unmount()
@@ -65,6 +65,6 @@ describe('User Journeys', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
     })
-    expect(document.documentElement.dataset.theme).toBe('nord')
+    expect(document.documentElement.dataset.theme).toBe('lavender-fields')
   })
 })
