@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore'
 import { firestore } from '../firebase/client'
 import type { SharedDocument } from '../types'
 
@@ -22,6 +22,20 @@ export async function publishSharedDocument(
 
   const ref = await addDoc(collection(firestore, SHARED_DOCUMENTS_COLLECTION), payload)
   return { shareId: ref.id }
+}
+
+export async function updateSharedDocument(
+  shareId: string,
+  input: PublishSharedDocumentInput,
+): Promise<void> {
+  const payload = {
+    markdown: input.markdown,
+    updatedAt: Date.now(),
+    ...(input.sourceDocId ? { sourceDocId: input.sourceDocId } : {}),
+  }
+
+  const ref = doc(firestore, SHARED_DOCUMENTS_COLLECTION, shareId)
+  await updateDoc(ref, payload)
 }
 
 export async function getSharedDocumentById(shareId: string): Promise<SharedDocument | null> {

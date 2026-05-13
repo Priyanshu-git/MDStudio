@@ -43,8 +43,8 @@ describe('User Journeys', () => {
     // 3. Verify preview updates
     expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
 
-    // 4. Toggle Documentation View
-    fireEvent.click(screen.getByRole('button', { name: 'Documentation View' }))
+    // 4. Toggle Read only view
+    fireEvent.click(screen.getByRole('button', { name: 'Read only view' }))
     expect(screen.queryByLabelText('Markdown input')).not.toBeInTheDocument()
     expect(screen.getByText('Back to Edit')).toBeInTheDocument()
 

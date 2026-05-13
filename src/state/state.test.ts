@@ -9,9 +9,12 @@ describe('App Store (Zustand)', () => {
     await db.appState.clear()
     useAppStore.setState({
       activeDocId: null,
+      activeShareId: null,
       isHydrated: false,
       draftMarkdown: '# Welcome to Markdown Studio\n\nPhase 2 shell is ready.',
       theme: 'github-light',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedMarkdown: null,
     })
   })
 

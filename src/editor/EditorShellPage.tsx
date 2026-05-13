@@ -2,7 +2,7 @@ import { useEffect, useDeferredValue, useState } from 'react'
 import { AppShellLayout } from '../components/layout/AppShellLayout'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore } from '../state/useAppStore'
-import { publishSharedDocument } from '../storage/shareDocuments'
+import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 
 export function EditorShellPage() {
   const mobileTab = useAppStore((state) => state.mobileTab)
@@ -17,6 +17,11 @@ export function EditorShellPage() {
   const persistDraft = useAppStore((state) => state.persistDraft)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
   const activeDocId = useAppStore((state) => state.activeDocId)
+  const activeShareId = useAppStore((state) => state.activeShareId)
+  const lastLocalSavedMarkdown = useAppStore((state) => state.lastLocalSavedMarkdown)
+  const lastCloudSavedMarkdown = useAppStore((state) => state.lastCloudSavedMarkdown)
+  const setLastCloudSavedMarkdown = useAppStore((state) => state.setLastCloudSavedMarkdown)
+  const linkActiveShare = useAppStore((state) => state.linkActiveShare)
   const [isPublishing, setIsPublishing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
@@ -24,9 +29,28 @@ export function EditorShellPage() {
 
   const deferredMarkdown = useDeferredValue(draftMarkdown)
 
+  const currentShareUrl =
+    activeShareId && typeof window !== 'undefined'
+      ? `${window.location.origin}/share/${activeShareId}`
+      : activeShareId
+        ? `/share/${activeShareId}`
+        : null
+  const hasUnsavedLocalChanges = draftMarkdown !== lastLocalSavedMarkdown
+  const isCloudSynced =
+    Boolean(activeShareId) && !hasUnsavedLocalChanges && draftMarkdown === (lastCloudSavedMarkdown ?? '')
+  const cloudStatusLabel = hasUnsavedLocalChanges
+    ? 'Unsaved Changes'
+    : isCloudSynced
+      ? 'Synced to Cloud'
+      : 'Local Only'
+
   useEffect(() => {
     void hydrateDocument()
   }, [hydrateDocument])
+
+  useEffect(() => {
+    setShareUrl(currentShareUrl)
+  }, [currentShareUrl])
 
   useEffect(() => {
     if (!isHydrated) {
@@ -38,7 +62,7 @@ export function EditorShellPage() {
     return () => window.clearTimeout(timeout)
   }, [draftMarkdown, isHydrated, persistDraft])
 
-  async function handlePublish() {
+  async function handleSaveAsNew() {
     setPublishError(null)
     setCopyState('idle')
     setIsPublishing(true)
@@ -48,9 +72,8 @@ export function EditorShellPage() {
         markdown: draftMarkdown,
         sourceDocId: activeDocId ?? undefined,
       })
-      const path = `/share/${result.shareId}`
-      const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
-      setShareUrl(url)
+      linkActiveShare(result.shareId, draftMarkdown)
+      setLastCloudSavedMarkdown(draftMarkdown)
     } catch {
       setPublishError('Unable to publish right now. Please try again.')
     } finally {
@@ -58,8 +81,29 @@ export function EditorShellPage() {
     }
   }
 
+  async function handleUpdateShare() {
+    if (!activeShareId) {
+      return
+    }
+    setPublishError(null)
+    setCopyState('idle')
+    setIsPublishing(true)
+
+    try {
+      await updateSharedDocument(activeShareId, {
+        markdown: draftMarkdown,
+        sourceDocId: activeDocId ?? undefined,
+      })
+      setLastCloudSavedMarkdown(draftMarkdown)
+    } catch {
+      setPublishError('Unable to update right now. Please try again.')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   async function handleCopyShareUrl() {
-    if (!shareUrl) {
+    if (!currentShareUrl) {
       return
     }
     if (!navigator.clipboard) {
@@ -67,7 +111,7 @@ export function EditorShellPage() {
       return
     }
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      await navigator.clipboard.writeText(currentShareUrl)
       setCopyState('copied')
     } catch {
       setCopyState('failed')
@@ -77,7 +121,7 @@ export function EditorShellPage() {
   return (
     <AppShellLayout
       title="Markdown Studio"
-      subtitle={editorMode === 'docs' ? 'Documentation View' : 'Editor'}
+      subtitle={editorMode === 'docs' ? 'Read only view' : 'Editor'}
       shellClassName={editorMode === 'edit' ? 'shell-edit-mode' : undefined}
       actions={
         <div className="topbar-actions">
@@ -93,15 +137,25 @@ export function EditorShellPage() {
               <option value="cherry-blossom">Cherry Blossom</option>
             </select>
           </label>
-          <button type="button" className="primary-button" onClick={() => void handlePublish()} disabled={isPublishing}>
-            {isPublishing ? 'Publishing...' : 'Publish'}
+          {activeShareId ? (
+            <button type="button" className="primary-button" onClick={() => void handleUpdateShare()} disabled={isPublishing}>
+              {isPublishing ? 'Updating...' : 'Update'}
+            </button>
+          ) : null}
+          <button type="button" className="primary-button" onClick={() => void handleSaveAsNew()} disabled={isPublishing}>
+            {isPublishing ? 'Saving...' : 'Save as New'}
           </button>
+          {activeShareId ? (
+            <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
+              Copy Link
+            </button>
+          ) : null}
           <button
             type="button"
             className="primary-button"
             onClick={() => setEditorMode(editorMode === 'edit' ? 'docs' : 'edit')}
           >
-            {editorMode === 'edit' ? 'Documentation View' : 'Back to Edit'}
+            {editorMode === 'edit' ? 'Read only view' : 'Back to Edit'}
           </button>
         </div>
       }
@@ -111,14 +165,16 @@ export function EditorShellPage() {
           {publishError}
         </section>
       ) : null}
-      {shareUrl ? (
+      <section className="publish-banner" role="status">
+        <span>
+          Status: <strong>{cloudStatusLabel}</strong>
+        </span>
+      </section>
+      {shareUrl && activeShareId ? (
         <section className="publish-banner" role="status">
           <span>
             Shared link: <a href={shareUrl}>{shareUrl}</a>
           </span>
-          <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
-            Copy Link
-          </button>
           {copyState === 'copied' ? <span>Copied</span> : null}
           {copyState === 'failed' ? <span>Copy failed</span> : null}
         </section>

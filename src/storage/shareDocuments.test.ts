@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSharedDocumentById, publishSharedDocument } from './shareDocuments'
+import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './shareDocuments'
 
 const addDocMock = vi.fn()
 const collectionMock = vi.fn()
 const docMock = vi.fn()
 const getDocMock = vi.fn()
+const updateDocMock = vi.fn()
 
 vi.mock('../firebase/client', () => ({
   firestore: { mocked: true },
@@ -15,6 +16,7 @@ vi.mock('firebase/firestore', () => ({
   collection: (...args: unknown[]) => collectionMock(...args),
   doc: (...args: unknown[]) => docMock(...args),
   getDoc: (...args: unknown[]) => getDocMock(...args),
+  updateDoc: (...args: unknown[]) => updateDocMock(...args),
 }))
 
 describe('shareDocuments', () => {
@@ -71,5 +73,20 @@ describe('shareDocuments', () => {
 
     const result = await getSharedDocumentById('missing-id')
     expect(result).toBeNull()
+  })
+
+  it('updates an existing shared document', async () => {
+    await updateSharedDocument('share-777', {
+      markdown: '# Updated',
+      sourceDocId: 'local-2',
+    })
+
+    expect(docMock).toHaveBeenCalledWith({ mocked: true }, 'sharedDocuments', 'share-777')
+    expect(updateDocMock).toHaveBeenCalledTimes(1)
+    expect(updateDocMock.mock.calls[0][1]).toMatchObject({
+      markdown: '# Updated',
+      sourceDocId: 'local-2',
+    })
+    expect(typeof updateDocMock.mock.calls[0][1].updatedAt).toBe('number')
   })
 })

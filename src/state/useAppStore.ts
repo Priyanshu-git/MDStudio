@@ -13,6 +13,9 @@ export type EditorMode = 'edit' | 'docs'
 
 type AppState = {
   activeDocId: string | null
+  activeShareId: string | null
+  lastLocalSavedMarkdown: string
+  lastCloudSavedMarkdown: string | null
   isHydrated: boolean
   theme: ThemeName
   mobileTab: MobileTab
@@ -23,12 +26,30 @@ type AppState = {
   setMobileTab: (tab: MobileTab) => void
   setEditorMode: (mode: EditorMode) => void
   setDraftMarkdown: (value: string) => void
+  linkActiveShare: (shareId: string, cloudMarkdown: string) => void
+  clearShareLink: () => void
+  setLastCloudSavedMarkdown: (markdown: string | null) => void
+  setLastLocalSavedMarkdown: (markdown: string) => void
+  hydrateTheme: () => Promise<void>
   hydrateDocument: () => Promise<void>
   persistDraft: () => Promise<void>
 }
 
+const VALID_THEMES: ThemeName[] = [
+  'github-light',
+  'dracula',
+  'lavender-fields',
+  'blue-eclipse',
+  'lush-forest',
+  'ink-wash',
+  'cherry-blossom',
+]
+
 export const useAppStore = create<AppState>((set, get) => ({
   activeDocId: null,
+  activeShareId: null,
+  lastLocalSavedMarkdown: '',
+  lastCloudSavedMarkdown: null,
   isHydrated: false,
   theme: 'github-light',
   mobileTab: 'edit',
@@ -59,28 +80,38 @@ Phase 2 shell is ready.`,
   setMobileTab: (tab) => set({ mobileTab: tab }),
   setEditorMode: (mode) => set({ editorMode: mode }),
   setDraftMarkdown: (value) => set({ draftMarkdown: value }),
+  linkActiveShare: (shareId, cloudMarkdown) =>
+    set({
+      activeShareId: shareId,
+      lastCloudSavedMarkdown: cloudMarkdown,
+    }),
+  clearShareLink: () =>
+    set({
+      activeShareId: null,
+      lastCloudSavedMarkdown: null,
+    }),
+  setLastCloudSavedMarkdown: (markdown) => set({ lastCloudSavedMarkdown: markdown }),
+  setLastLocalSavedMarkdown: (markdown) => set({ lastLocalSavedMarkdown: markdown }),
+  hydrateTheme: async () => {
+    const persistedTheme = await getThemePreference()
+    if (persistedTheme && VALID_THEMES.includes(persistedTheme as ThemeName)) {
+      set({ theme: persistedTheme as ThemeName })
+    }
+  },
   hydrateDocument: async () => {
     if (get().isHydrated) {
       return
     }
     const doc = await getOrCreateActiveDocument(get().draftMarkdown)
     const persistedTheme = await getThemePreference()
-    const validThemes: ThemeName[] = [
-      'github-light',
-      'dracula',
-      'lavender-fields',
-      'blue-eclipse',
-      'lush-forest',
-      'ink-wash',
-      'cherry-blossom',
-    ]
     const resolvedTheme =
-      persistedTheme && validThemes.includes(persistedTheme as ThemeName)
+      persistedTheme && VALID_THEMES.includes(persistedTheme as ThemeName)
         ? (persistedTheme as ThemeName)
         : get().theme
     set({
       activeDocId: doc.id,
       draftMarkdown: doc.markdown,
+      lastLocalSavedMarkdown: doc.markdown,
       theme: resolvedTheme,
       isHydrated: true,
     })
@@ -91,5 +122,6 @@ Phase 2 shell is ready.`,
       return
     }
     await updateDocumentMarkdown(activeDocId, draftMarkdown)
+    set({ lastLocalSavedMarkdown: draftMarkdown })
   },
 }))

@@ -120,6 +120,15 @@ select {
   border-bottom: 1px solid var(--border);
   padding: 12px 16px;
   background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.topbar-hidden {
+  transform: translateY(calc(-100% - 1px));
 }
 
 .topbar-subtitle {
@@ -130,12 +139,20 @@ select {
 }
 
 .primary-button {
+  --button-ripple-color: color-mix(in oklab, white 72%, transparent);
   border: 1px solid var(--text);
   background: var(--text);
   color: var(--surface);
   border-radius: 6px;
   padding: 8px 12px;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .primary-button:disabled {
@@ -144,12 +161,20 @@ select {
 }
 
 .secondary-button {
+  --button-ripple-color: color-mix(in oklab, var(--text) 20%, transparent);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 6px;
   padding: 6px 10px;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .split-layout {
@@ -189,12 +214,19 @@ select {
 }
 
 .tab-button {
+  --button-ripple-color: color-mix(in oklab, var(--text) 18%, transparent);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 6px;
   padding: 6px 10px;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .tab-button-active {
@@ -472,4 +504,66 @@ select {
   color: var(--text);
   border-radius: 6px;
   padding: 6px 8px;
+}
+
+.primary-button:not(:disabled):hover {
+  background: color-mix(in oklab, var(--text) 94%, var(--surface));
+  border-color: color-mix(in oklab, var(--text) 90%, var(--surface));
+}
+
+.secondary-button:not(:disabled):hover,
+.tab-button:not(:disabled):hover {
+  background: color-mix(in oklab, var(--surface) 96%, var(--soft));
+  border-color: color-mix(in oklab, var(--border) 88%, var(--muted));
+}
+
+button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--text) 55%, white);
+  outline-offset: 2px;
+}
+
+.primary-button:not(:disabled):active {
+  background: color-mix(in oklab, var(--text) 90%, var(--surface));
+}
+
+.secondary-button:not(:disabled):active,
+.tab-button:not(:disabled):active {
+  background: color-mix(in oklab, var(--surface) 92%, var(--soft));
+}
+
+.button-ripple {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  background: var(--button-ripple-color, color-mix(in oklab, white 72%, transparent));
+  transform: scale(0);
+  opacity: 0.32;
+  z-index: 0;
+  will-change: transform, opacity;
+  animation: button-ripple 320ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.primary-button > :not(.button-ripple),
+.secondary-button > :not(.button-ripple),
+.tab-button > :not(.button-ripple) {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes button-ripple {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.34;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button-ripple {
+    animation: none;
+    opacity: 0;
+  }
 }

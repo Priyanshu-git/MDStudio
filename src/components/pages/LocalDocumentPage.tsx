@@ -8,13 +8,17 @@ export function LocalDocumentPage() {
   const { id } = useParams()
   const setActiveDocId = useAppStore((state) => state.setActiveDocId)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+  const clearShareLink = useAppStore((state) => state.clearShareLink)
+  const setLastLocalSavedMarkdown = useAppStore((state) => state.setLastLocalSavedMarkdown)
 
   useEffect(() => {
+    clearShareLink()
     setActiveDocId(id ?? null)
     if (id) {
       void getDocumentById(id).then((doc) => {
         if (doc) {
           setDraftMarkdown(doc.markdown)
+          setLastLocalSavedMarkdown(doc.markdown)
         }
       })
     }
