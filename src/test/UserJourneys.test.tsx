@@ -78,8 +78,8 @@ describe('User Journeys', () => {
     expect(previewButton).toHaveClass('active')
 
     // 5. Change theme
-    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'dracula' } })
-    expect(document.documentElement.dataset.theme).toBe('dracula')
+    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'blue-eclipse' } })
+    expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
 
     // 6. Manual save is required before reload persistence
     await act(async () => {
@@ -113,6 +113,6 @@ describe('User Journeys', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
     })
-    expect(document.documentElement.dataset.theme).toBe('dracula')
+    expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
   })
 })

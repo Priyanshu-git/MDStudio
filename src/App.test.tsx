@@ -225,8 +225,10 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'dracula' } })
-    expect(document.documentElement.dataset.theme).toBe('dracula')
+    expect(screen.getByRole('option', { name: 'LIGHT' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'DARK' })).toBeInTheDocument()
+    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'blue-eclipse' } })
+    expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
   })
 
   it('opens the account menu without signing out immediately', () => {

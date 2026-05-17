@@ -1,7 +1,10 @@
 export type ThemeName =
   | 'github-light'
   | 'github-dark'
-  | 'dracula'
+  | 'pastel-mint'
+  | 'minimal-ivory'
+  | 'one-dark'
+  | 'blue-eclipse'
 
 export type DocumentSource = 'local' | 'firebase'
 

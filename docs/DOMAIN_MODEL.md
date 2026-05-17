@@ -24,7 +24,10 @@ type Document = {
 type ThemeName =
   | 'github-light'
   | 'github-dark'
-  | 'dracula'
+  | 'pastel-mint'
+  | 'minimal-ivory'
+  | 'one-dark'
+  | 'blue-eclipse'
 ```
 
 ## SharedDocument

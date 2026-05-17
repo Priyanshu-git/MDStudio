@@ -74,7 +74,7 @@ If the viewer is not the owner, they see `Make a Copy`. Signed-out users are pro
 
 ## Theme Behavior
 
-The supported themes are `github-light`, `github-dark`, and `dracula`.
+The supported themes are `github-light`, `github-dark`, `pastel-mint`, `minimal-ivory`, `one-dark`, and `blue-eclipse`.
 
 Theme preference is stored locally. Shared documents do not persist theme, so `/share/:id` renders with the viewer's current local theme preference.
 

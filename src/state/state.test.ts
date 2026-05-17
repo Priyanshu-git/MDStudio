@@ -65,10 +65,10 @@ describe('App Store (Zustand)', () => {
   })
 
   it('updates and persists theme', async () => {
-    useAppStore.getState().setTheme('dracula')
-    expect(useAppStore.getState().theme).toBe('dracula')
+    useAppStore.getState().setTheme('blue-eclipse')
+    expect(useAppStore.getState().theme).toBe('blue-eclipse')
 
     const item = await db.appState.get('theme')
-    expect(item?.value).toBe('dracula')
+    expect(item?.value).toBe('blue-eclipse')
   })
 })

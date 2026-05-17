@@ -33,9 +33,11 @@ export function CodeBlock({
       try {
         const { codeToHtml } = await import('shiki')
         const shikiTheme =
-          theme === 'dracula' || theme === 'github-dark'
-            ? 'dracula'
-            : 'github-light'
+          theme === 'one-dark' || theme === 'blue-eclipse'
+            ? 'one-dark-pro'
+            : theme === 'github-dark'
+              ? 'github-dark'
+              : 'github-light'
         const html = await codeToHtml(code, {
           lang: normalizedLanguage,
           theme: shikiTheme,

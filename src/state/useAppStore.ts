@@ -63,7 +63,14 @@ graph TD
 \`\`\`
 `
 
-const VALID_THEMES: ThemeName[] = ['github-light', 'github-dark', 'dracula']
+const VALID_THEMES: ThemeName[] = [
+  'github-light',
+  'github-dark',
+  'pastel-mint',
+  'minimal-ivory',
+  'one-dark',
+  'blue-eclipse',
+]
 
 type AppState = {
   activeDocId: string | null

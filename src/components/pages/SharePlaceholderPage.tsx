@@ -164,9 +164,18 @@ export function SharePlaceholderPage() {
       <header className="shared-topbar">
         <strong>{document?.title ?? 'Shared Document'}</strong>
         <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
+          <option value="__theme-group-light" disabled className="theme-select-group-label">
+            LIGHT
+          </option>
           <option value="github-light">GitHub Light</option>
+          <option value="pastel-mint">Lavender Frost</option>
+          <option value="minimal-ivory">Minimal Ivory</option>
+          <option value="__theme-group-dark" disabled className="theme-select-group-label">
+            DARK
+          </option>
           <option value="github-dark">GitHub Dark</option>
-          <option value="dracula">Dracula</option>
+          <option value="one-dark">One Dark</option>
+          <option value="blue-eclipse">Blue Eclipse</option>
         </select>
       </header>
 

@@ -10,7 +10,10 @@ Application-wide theme with coordinated behavior across:
 ## Required Theme Set
 - `github-light`
 - `github-dark`
-- `dracula`
+- `pastel-mint` (Lavender Frost)
+- `minimal-ivory`
+- `one-dark`
+- `blue-eclipse`
 
 ## Rules
 - Theme changes must propagate consistently to all surfaces.

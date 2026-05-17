@@ -12,6 +12,7 @@ import {
   FileText,
   GitBranch,
   Cloud,
+  ChevronDown,
   Heading1,
   Heading2,
   HardDrive,
@@ -84,6 +85,25 @@ const mobileTabs: Array<{ id: MobileTab; label: string }> = [
   { id: 'outline', label: 'Outline' },
   { id: 'files', label: 'Files' },
 ]
+
+const themeGroups = [
+  {
+    label: 'Light',
+    options: [
+      { value: 'github-light', label: 'GitHub Light' },
+      { value: 'pastel-mint', label: 'Lavender Frost' },
+      { value: 'minimal-ivory', label: 'Minimal Ivory' },
+    ],
+  },
+  {
+    label: 'Dark',
+    options: [
+      { value: 'github-dark', label: 'GitHub Dark' },
+      { value: 'one-dark', label: 'One Dark' },
+      { value: 'blue-eclipse', label: 'Blue Eclipse' },
+    ],
+  },
+] as const
 
 const statusLabels: Record<SaveStatus, string> = {
   'local-only': 'Local Only',
@@ -196,6 +216,7 @@ export function EditorShellPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
+  const themeMenuRef = useRef<HTMLDivElement | null>(null)
   const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -210,6 +231,7 @@ export function EditorShellPage() {
   const [fileSearch, setFileSearch] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
   const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('documents')
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
 
   const activeDocId = useAppStore((state) => state.activeDocId)
   const activeShareId = useAppStore((state) => state.activeShareId)
@@ -252,6 +274,8 @@ export function EditorShellPage() {
   const showSidebar = true
   const showEditor = desktopViewMode === 'edit' || desktopViewMode === 'split'
   const showPreview = desktopViewMode === 'preview' || desktopViewMode === 'split'
+  const selectedThemeLabel =
+    themeGroups.flatMap((group) => group.options).find((option) => option.value === theme)?.label ?? 'Theme'
 
   useEffect(() => {
     void hydrateDocument()
@@ -297,6 +321,37 @@ export function EditorShellPage() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isProfileMenuOpen])
+
+  useEffect(() => {
+    if (!isThemeMenuOpen) {
+      return
+    }
+
+    function closeThemeMenu() {
+      setIsThemeMenuOpen(false)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (themeMenuRef.current?.contains(target)) {
+        return
+      }
+      closeThemeMenu()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeThemeMenu()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isThemeMenuOpen])
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -574,11 +629,43 @@ export function EditorShellPage() {
           <Save size={16} />
           Save
         </button>
-        <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
-          <option value="github-light">GitHub Light</option>
-          <option value="github-dark">GitHub Dark</option>
-          <option value="dracula">Dracula</option>
-        </select>
+        <div className="theme-menu" ref={themeMenuRef}>
+          <button
+            type="button"
+            className="theme-select"
+            aria-haspopup="menu"
+            aria-expanded={isThemeMenuOpen}
+            aria-label="Select theme"
+            onClick={() => setIsThemeMenuOpen((open) => !open)}
+          >
+            <span>{selectedThemeLabel}</span>
+            <ChevronDown size={16} />
+          </button>
+          {isThemeMenuOpen ? (
+            <section className="theme-menu-popover" role="menu" aria-label="Theme options">
+              {themeGroups.map((group) => (
+                <div key={group.label} className="theme-menu-group">
+                  <p className="theme-select-group-label">{group.label}</p>
+                  {group.options.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={option.value === theme}
+                      className={option.value === theme ? 'theme-menu-option active' : 'theme-menu-option'}
+                      onClick={() => {
+                        setTheme(option.value as typeof theme)
+                        setIsThemeMenuOpen(false)
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </section>
+          ) : null}
+        </div>
         <button type="button" className="secondary-button" onClick={() => setIsShareOpen(true)}>
           <Share2 size={16} />
           Share

@@ -8,10 +8,11 @@ type MermaidBlockProps = {
 
 async function renderMermaid(id: string, code: string, theme: ThemeName): Promise<string> {
   const mermaid = (await import('mermaid')).default
+  const mermaidTheme = theme === 'github-dark' || theme === 'one-dark' || theme === 'blue-eclipse' ? 'dark' : 'default'
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
-    theme: theme === 'dracula' ? 'dark' : 'default',
+    theme: mermaidTheme,
   })
   const result = await mermaid.render(`mermaid-${id}`, code)
   return result.svg
