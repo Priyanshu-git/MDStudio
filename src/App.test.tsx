@@ -2,8 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { listenToAuthState, signOutCurrentUser } from './firebase/auth'
 import { useAppStore } from './state/useAppStore'
 import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './storage/shareDocuments'
+
+const authMockState = vi.hoisted(() => ({
+  currentUser: null as unknown,
+}))
 
 vi.mock('./storage/shareDocuments', () => ({
   publishSharedDocument: vi.fn(),
@@ -13,7 +18,7 @@ vi.mock('./storage/shareDocuments', () => ({
 
 vi.mock('./firebase/auth', () => ({
   listenToAuthState: vi.fn((callback: (user: unknown) => void) => {
-    callback(null)
+    callback(authMockState.currentUser)
     return vi.fn()
   }),
   signInWithGoogle: vi.fn(),
@@ -40,6 +45,7 @@ function mockMobileViewport(matches: boolean) {
 describe('App routing shell', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    authMockState.currentUser = null
     mockMobileViewport(false)
     useAppStore.setState({
       activeDocId: null,
@@ -145,6 +151,87 @@ describe('App routing shell', () => {
     expect(document.documentElement.dataset.theme).toBe('dracula')
   })
 
+  it('opens the account menu without signing out immediately', () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Priyanshu Gaurav',
+      email: 'priyanshu.grv11@gmail.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.studio-topbar .avatar-button')!)
+
+    expect(screen.getByText('Priyanshu Gaurav')).toBeInTheDocument()
+    expect(screen.getByText('priyanshu.grv11@gmail.com')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    expect(signOutCurrentUser).not.toHaveBeenCalled()
+    expect(listenToAuthState).toHaveBeenCalled()
+  })
+
+  it('requires inline confirmation before signing out', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Priyanshu Gaurav',
+      email: 'priyanshu.grv11@gmail.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.studio-topbar .avatar-button')!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
+
+    expect(screen.getByText('Sign out?')).toBeInTheDocument()
+    expect(signOutCurrentUser).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sign out' }))
+    expect(screen.queryByText('Sign out?')).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm sign out' }))
+
+    await waitFor(() => {
+      expect(signOutCurrentUser).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('closes and resets the account menu from escape and outside clicks', () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Priyanshu Gaurav',
+      email: 'priyanshu.grv11@gmail.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    const accountButton = container.querySelector<HTMLButtonElement>('.studio-topbar .avatar-button')!
+
+    fireEvent.click(accountButton)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByText('Sign out?')).not.toBeInTheDocument()
+
+    fireEvent.click(accountButton)
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('menuitem', { name: 'Sign out' })).not.toBeInTheDocument()
+  })
+
   it('creates and cleans up ripple on pointerdown and keyboard activation', () => {
     window.history.pushState({}, '', '/editor')
     render(
@@ -214,6 +301,27 @@ describe('App routing shell', () => {
     fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.mobile-mode-tab')[1])
 
     expect(container.querySelectorAll('.markdown-editor')).toHaveLength(0)
+  })
+
+  it('shows account access in the mobile topbar', () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Priyanshu Gaurav',
+      email: 'priyanshu.grv11@gmail.com',
+      photoURL: null,
+    }
+    mockMobileViewport(true)
+    useAppStore.setState({ isHydrated: true, draftTitle: 'Mobile Test', draftMarkdown: 'Body' })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'More options' })).not.toBeInTheDocument()
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.mobile-topbar .avatar-button')!)
+    expect(screen.getByText('Priyanshu Gaurav')).toBeInTheDocument()
   })
 
   it('queues mobile sheet toolbar actions until the write editor is mounted', async () => {

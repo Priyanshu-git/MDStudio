@@ -166,6 +166,8 @@ export function EditorShellPage() {
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingPreviewLineRef = useRef<number | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const desktopAccountRef = useRef<HTMLDivElement | null>(null)
+  const mobileAccountRef = useRef<HTMLDivElement | null>(null)
   const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -173,6 +175,8 @@ export function EditorShellPage() {
   const [shareError, setShareError] = useState<string | null>(null)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isInsertOpen, setIsInsertOpen] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [fileSearch, setFileSearch] = useState('')
@@ -226,7 +230,45 @@ export function EditorShellPage() {
     void refreshDocuments()
   }, [hydrateDocument, refreshDocuments])
 
-  useEffect(() => listenToAuthState(setUser), [])
+  useEffect(() => listenToAuthState((nextUser) => {
+    setUser(nextUser)
+    if (!nextUser) {
+      setIsProfileMenuOpen(false)
+      setIsConfirmingSignOut(false)
+    }
+  }), [])
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) {
+      return
+    }
+
+    function closeProfileMenu() {
+      setIsProfileMenuOpen(false)
+      setIsConfirmingSignOut(false)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (desktopAccountRef.current?.contains(target) || mobileAccountRef.current?.contains(target)) {
+        return
+      }
+      closeProfileMenu()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeProfileMenu()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isProfileMenuOpen])
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -391,12 +433,27 @@ export function EditorShellPage() {
     }
   }
 
-  async function handleSignOut() {
+  function toggleProfileMenu() {
+    setIsProfileMenuOpen((isOpen) => !isOpen)
+    setIsConfirmingSignOut(false)
+  }
+
+  async function handleConfirmedSignOut() {
+    const didSignOut = await handleSignOut()
+    if (didSignOut) {
+      setIsProfileMenuOpen(false)
+      setIsConfirmingSignOut(false)
+    }
+  }
+
+  async function handleSignOut(): Promise<boolean> {
     setAuthError(null)
     try {
       await signOutCurrentUser()
+      return true
     } catch {
       setAuthError('Unable to sign out right now.')
+      return false
     }
   }
 
@@ -497,9 +554,18 @@ export function EditorShellPage() {
           </div>
         </div>
         {user ? (
-          <button type="button" className="avatar-button" onClick={() => void handleSignOut()} aria-label="Sign out">
-            {user.photoURL ? <img src={user.photoURL} alt="" /> : <UserCircle size={20} />}
-          </button>
+          <div className="account-menu-anchor" ref={desktopAccountRef}>
+            <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
+            {!isMobileViewport && isProfileMenuOpen ? (
+              <AccountMenu
+                user={user}
+                isConfirmingSignOut={isConfirmingSignOut}
+                onRequestSignOut={() => setIsConfirmingSignOut(true)}
+                onCancelSignOut={() => setIsConfirmingSignOut(false)}
+                onConfirmSignOut={() => void handleConfirmedSignOut()}
+              />
+            ) : null}
+          </div>
         ) : (
           <button type="button" className="secondary-button compact" onClick={() => void handleSignIn()}>
             <LogIn size={16} />
@@ -513,9 +579,24 @@ export function EditorShellPage() {
           <strong>{mobileTab === 'files' ? 'Markdown Studio' : draftTitle}</strong>
         </div>
         <span className={`save-badge save-badge-${saveStatus}`}>{statusLabels[saveStatus]}</span>
-        <button type="button" className="icon-button" aria-label="More options">
-          <MoreVertical size={20} />
-        </button>
+        {user ? (
+          <div className="account-menu-anchor mobile-account-anchor" ref={mobileAccountRef}>
+            <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
+            {isMobileViewport && isProfileMenuOpen ? (
+              <AccountMenu
+                user={user}
+                isConfirmingSignOut={isConfirmingSignOut}
+                onRequestSignOut={() => setIsConfirmingSignOut(true)}
+                onCancelSignOut={() => setIsConfirmingSignOut(false)}
+                onConfirmSignOut={() => void handleConfirmedSignOut()}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <button type="button" className="icon-button" onClick={() => void handleSignIn()} aria-label="Sign in">
+            <LogIn size={20} />
+          </button>
+        )}
       </header>
       <nav className="mobile-mode-tabs" aria-label="Mobile mode">
         {mobileTabs.map((tab) => (
@@ -713,6 +794,92 @@ function PanelHeader({ title }: { title: string }) {
     <div className="panel-header">
       <h2>{title}</h2>
     </div>
+  )
+}
+
+function getUserInitial(user: User): string | null {
+  const source = user.displayName || user.email
+  return source ? source.trim().charAt(0).toUpperCase() : null
+}
+
+function AccountAvatar({ user, size = 20 }: { user: User; size?: number }) {
+  const initial = getUserInitial(user)
+  if (user.photoURL) {
+    return <img src={user.photoURL} alt="" />
+  }
+  if (initial) {
+    return <span className="avatar-initial">{initial}</span>
+  }
+  return <UserCircle size={size} />
+}
+
+function AccountButton({
+  user,
+  isOpen,
+  onClick,
+}: {
+  user: User
+  isOpen: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="avatar-button"
+      onClick={onClick}
+      aria-label="Account menu"
+      aria-haspopup="menu"
+      aria-expanded={isOpen}
+    >
+      <AccountAvatar user={user} />
+    </button>
+  )
+}
+
+function AccountMenu({
+  user,
+  isConfirmingSignOut,
+  onRequestSignOut,
+  onCancelSignOut,
+  onConfirmSignOut,
+}: {
+  user: User
+  isConfirmingSignOut: boolean
+  onRequestSignOut: () => void
+  onCancelSignOut: () => void
+  onConfirmSignOut: () => void
+}) {
+  return (
+    <section className="account-menu" role={isConfirmingSignOut ? 'dialog' : 'menu'} aria-label="Account">
+      <div className="account-menu-profile">
+        <span className="account-menu-avatar" aria-hidden="true">
+          <AccountAvatar user={user} size={28} />
+        </span>
+        <span className="account-menu-identity">
+          <strong>{user.displayName || 'Signed in user'}</strong>
+          <small>{user.email || 'No email available'}</small>
+        </span>
+      </div>
+      <div className="account-menu-divider" />
+      {isConfirmingSignOut ? (
+        <div className="account-confirm">
+          <strong>Sign out?</strong>
+          <div className="account-confirm-actions">
+            <button type="button" className="secondary-button compact" onClick={onCancelSignOut} aria-label="Cancel sign out">
+              Cancel
+            </button>
+            <button type="button" className="primary-button compact" onClick={onConfirmSignOut} aria-label="Confirm sign out">
+              Confirm
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="account-menu-action" onClick={onRequestSignOut} role="menuitem">
+          <LogOut size={16} />
+          Sign out
+        </button>
+      )}
+    </section>
   )
 }
 
