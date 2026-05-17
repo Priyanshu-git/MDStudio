@@ -7,13 +7,13 @@ Foundation scaffold and AI-friendly documentation baseline.
 Route-ready app shell and responsive editor/preview layout.
 
 ## Phase 2 (Completed)
-Secure markdown pipeline with GFM and math, including Documentation View mode.
+Secure markdown pipeline with GFM and math, including read-only preview surfaces.
 
 ## Phase 3 (Completed)
 Custom code block renderer and Mermaid block renderer.
 
 ## Phase 4 (Completed)
-IndexedDB persistence and autosave.
+IndexedDB persistence, active document hydration, manual save, and dirty-state tracking.
 
 ## Phase 5 (Completed)
 Theme integration across UI, markdown, code, and Mermaid.
@@ -24,5 +24,18 @@ PWA and offline hardening.
 ## Phase 7 (Completed)
 Quality, performance, and release hardening.
 
-## Phase 2 Sharing Extension Point
-- `/share/:id` route is reserved for backend-enabled public sharing in a future phase.
+## Phase 8 (Completed)
+Authenticated sharing: Google sign-in, Firestore `sharedDocuments`, public `/share/:id`, owner edit-original flow, and non-owner make-copy flow.
+
+## Phase 9 (Completed)
+Account menu polish: desktop/mobile avatar access, identity display, inline sign-out confirmation, Escape/outside-click reset, and regression coverage.
+
+## Phase 10 (Completed)
+User-flow documentation covering local editing, desktop/mobile authoring, import/export, account access, sharing, shared-link viewing, theming, and offline expectations.
+
+## Future Extension Points
+- Stronger Firestore schema/rate-limit hardening.
+- Share expiry or unpublish controls.
+- Version history.
+- Collaboration.
+- Native DOCX/PDF export beyond browser print.

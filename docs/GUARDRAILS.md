@@ -3,7 +3,7 @@
 ## Hard Guardrails (Must Never Be Violated)
 
 1. **MVP Scope Lock**
-   - Do not implement auth, collaboration, SSR, export, or backend sharing in MVP.
+   - Do not implement collaboration, SSR, server-side document authority, ownership transfer, or native DOCX export without roadmap approval.
 
 2. **Rendering Security**
    - Raw HTML rendering stays disabled.
@@ -14,7 +14,8 @@
    - Fenced code blocks must route through custom code renderer components.
 
 4. **Data Source of Truth**
-   - IndexedDB is the canonical document store for MVP.
+   - IndexedDB is the canonical editable document store.
+   - Firestore is a published share copy, not the source of truth for editor drafts.
    - No alternate persistent source may become authoritative without ADR + docs update.
 
 5. **Change Protocol**

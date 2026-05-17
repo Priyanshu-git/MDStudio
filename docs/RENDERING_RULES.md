@@ -1,11 +1,12 @@
 # Rendering Rules
 
-## Supported in MVP Roadmap
+## Supported
 - Core markdown
 - GFM (`remark-gfm`)
 - Math (`remark-math` + `rehype-katex`)
 - Custom fenced renderer path for `code` and `mermaid`
-- Read-only full-page Documentation View on `/editor`
+- Read-only preview surfaces in `/editor` and `/share/:id`
+- Source-line metadata for preview scrolling from outline selections
 
 ## Forbidden
 - Raw HTML rendering
@@ -16,4 +17,4 @@
 - `react-markdown` configured with HTML disabled.
 - Links and image URLs must pass scheme validation.
 - Mermaid input treated as user content and rendered in constrained component flow.
-- Documentation View reuses the same markdown pipeline and stays read-only.
+- Shared documents reuse the same markdown pipeline and stay read-only.

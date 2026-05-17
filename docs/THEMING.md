@@ -9,13 +9,11 @@ Application-wide theme with coordinated behavior across:
 
 ## Required Theme Set
 - `github-light`
+- `github-dark`
 - `dracula`
-- `lavender-fields`
-- `blue-eclipse`
-- `lush-forest`
-- `ink-wash`
-- `cherry-blossom`
 
 ## Rules
 - Theme changes must propagate consistently to all surfaces.
 - New themes must include explicit mappings for all four theme areas.
+- Theme preference is stored locally in IndexedDB app state.
+- Shared documents do not persist theme; `/share/:id` renders with the viewer's current local theme preference.

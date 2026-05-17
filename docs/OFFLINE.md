@@ -9,16 +9,21 @@ Markdown Studio is designed to be fully functional offline.
 
 ## Offline Features
 
-- **Editing:** Create, edit, and delete documents.
+- **Editing:** Create, edit, save, and reopen documents.
+- **Local documents:** Reopen recent documents from IndexedDB.
+- **Import:** Import `.md` files into a local draft.
+- **Export:** Export Markdown and HTML locally; PDF uses the browser print flow.
 - **Rendering:** Full markdown rendering including:
   - GFM (GitHub Flavored Markdown)
   - Math (KaTeX)
   - Diagrams (Mermaid)
   - Syntax Highlighting (Shiki)
-- **Autosave:** Your work is automatically saved to local storage as you type.
+- **Save state:** Unsaved changes are tracked locally and protected by a browser-leave warning.
 
 ## Limitations
 
+- **Sign-in and sharing:** Google sign-in, Firestore publish/update, and loading uncached shared links require a network connection.
+- **Shared documents:** `/share/:id` reads Firestore and is not the canonical editable source.
 - **Remote Images:** Markdown images pointing to external URLs will not be available offline unless they have been previously cached by your browser's standard cache.
 - **Initial Installation:** You must visit the application once while online to allow the service worker to install and cache the assets.
 - **Updates:** Application updates will be downloaded in the background when you are online and applied automatically on the next reload.

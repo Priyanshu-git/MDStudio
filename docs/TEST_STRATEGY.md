@@ -2,8 +2,8 @@
 
 ## Layers
 - Unit: rendering helpers, sanitizers, store reducers.
-- Integration: editor + preview route behavior and persistence interactions.
-- E2E: desktop/mobile routing and offline behavior.
+- Integration: editor + preview route behavior, persistence interactions, auth/sharing flows, and account menu behavior.
+- E2E: desktop/mobile routing, sharing, and offline behavior.
 
 ## Phase 0 Required Checks
 - `npm run lint`
@@ -13,6 +13,11 @@
 
 ## Regression Priorities
 - Route contract (`/`, `/editor`, `/doc/:id`, `/share/:id`).
-- Documentation View mode toggle and read-only behavior.
+- User flows documented in `docs/USER_FLOWS.md`.
+- Desktop view modes and mobile tabs.
+- Account menu open/close behavior, inline sign-out confirmation, and mobile account access.
+- Google sign-in gating for share publishing and make-copy behavior.
+- Owner-only edit-original behavior on shared documents.
 - Domain type consistency from single canonical module.
 - Security defaults for markdown rendering.
+- Local persistence, share snapshots, and save status transitions.
