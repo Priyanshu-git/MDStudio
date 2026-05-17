@@ -129,7 +129,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastCloudSavedTitle: null,
   lastCloudSavedMarkdown: null,
   isHydrated: false,
-  theme: 'github-light',
+  theme: 'github-dark',
   mobileTab: 'write',
   desktopViewMode: 'split',
   saveStatus: 'local-only',
