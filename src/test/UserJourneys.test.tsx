@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { App } from '../App'
 import { db } from '../storage/db'
+import { useAppStore } from '../state/useAppStore'
 
 // Mock shiki and mermaid to avoid heavy lifting in integration tests
 vi.mock('shiki', () => ({
@@ -14,6 +15,16 @@ vi.mock('mermaid', () => ({
     initialize: vi.fn(),
     render: vi.fn(async (id) => ({ svg: `<svg id="${id}">Diagram</svg>` })),
   },
+}))
+
+vi.mock('../firebase/auth', () => ({
+  listenToAuthState: vi.fn((callback: (user: unknown) => void) => {
+    callback(null)
+    return vi.fn()
+  }),
+  signInWithGoogle: vi.fn(),
+  signOutCurrentUser: vi.fn(),
+  getOwnerProfile: vi.fn(() => ({ uid: 'user-1', displayName: 'Ada', email: 'ada@example.com' })),
 }))
 
 describe('User Journeys', () => {
@@ -33,26 +44,32 @@ describe('User Journeys', () => {
 
     // 1. Initial hydration
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /Welcome to Markdown Studio/ })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: /Markdown Rendering Test File/ })).toBeInTheDocument()
     })
 
-    // 2. Edit markdown
-    const editor = screen.getByLabelText('Markdown input')
-    fireEvent.change(editor, { target: { value: '# My New Document\n\nSome content.' } })
+    // 2. Edit markdown through the V2 store-backed CodeMirror flow
+    act(() => {
+      useAppStore.getState().setDraftMarkdown('# My New Document\n\nSome content.')
+    })
 
     // 3. Verify preview updates
     expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
 
-    // 4. Toggle Read only view
-    fireEvent.click(screen.getByRole('button', { name: 'Read only view' }))
-    expect(screen.queryByLabelText('Markdown input')).not.toBeInTheDocument()
-    expect(screen.getByText('Back to Edit')).toBeInTheDocument()
+    // 4. Toggle Preview view
+    const previewButton = screen.getAllByRole('button', { name: 'Preview' })[0]
+    fireEvent.click(previewButton)
+    expect(previewButton).toHaveClass('active')
 
     // 5. Change theme
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'lavender-fields' } })
-    expect(document.documentElement.dataset.theme).toBe('lavender-fields')
+    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'dracula' } })
+    expect(document.documentElement.dataset.theme).toBe('dracula')
 
-    // 6. Simulate reload by unmounting and remounting
+    // 6. Manual save is required before reload persistence
+    await act(async () => {
+      await useAppStore.getState().saveDraft()
+    })
+
+    // 7. Simulate reload by unmounting and remounting
     unmount()
     
     render(
@@ -65,6 +82,6 @@ describe('User Journeys', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
     })
-    expect(document.documentElement.dataset.theme).toBe('lavender-fields')
+    expect(document.documentElement.dataset.theme).toBe('dracula')
   })
 })

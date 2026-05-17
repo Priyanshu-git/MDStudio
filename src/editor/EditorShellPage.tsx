@@ -1,244 +1,898 @@
-import { useEffect, useDeferredValue, useState } from 'react'
-import { AppShellLayout } from '../components/layout/AppShellLayout'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import type { User } from 'firebase/auth'
+import {
+  Bold,
+  BookOpen,
+  CheckSquare,
+  Code,
+  Copy,
+  Download,
+  Edit3,
+  Eye,
+  FileText,
+  GitBranch,
+  Heading1,
+  Heading2,
+  Image,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  LogIn,
+  LogOut,
+  Minus,
+  MoreVertical,
+  Plus,
+  Quote,
+  Redo2,
+  Save,
+  Search,
+  Share2,
+  Sigma,
+  Table,
+  Undo2,
+  Upload,
+  UserCircle,
+} from 'lucide-react'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
-import { useAppStore } from '../state/useAppStore'
+import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
+import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
+import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
+import type { DesktopViewMode, MobileTab, SaveStatus } from '../types'
+import type { MarkdownInsertAction } from './markdownInsert'
+
+type OutlineItem = {
+  id: string
+  text: string
+  level: number
+  line: number
+}
+
+type ToolbarItem = {
+  action: MarkdownInsertAction
+  label: string
+  icon: typeof Bold
+}
+
+type DesktopSidebarTab = 'documents' | 'outline'
+
+const toolbarItems: ToolbarItem[] = [
+  { action: 'bold', label: 'Bold', icon: Bold },
+  { action: 'italic', label: 'Italic', icon: Italic },
+  { action: 'h1', label: 'Heading 1', icon: Heading1 },
+  { action: 'h2', label: 'Heading 2', icon: Heading2 },
+  { action: 'link', label: 'Link', icon: Link },
+  { action: 'image', label: 'Image from URL', icon: Image },
+  { action: 'table', label: 'Table', icon: Table },
+  { action: 'code', label: 'Code block', icon: Code },
+  { action: 'math', label: 'Math equation', icon: Sigma },
+  { action: 'mermaid', label: 'Mermaid diagram', icon: GitBranch },
+  { action: 'checklist', label: 'Checklist', icon: CheckSquare },
+  { action: 'bullet-list', label: 'Bullet list', icon: List },
+  { action: 'numbered-list', label: 'Numbered list', icon: ListOrdered },
+  { action: 'quote', label: 'Quote', icon: Quote },
+  { action: 'hr', label: 'Horizontal rule', icon: Minus },
+]
+
+const mobileTabs: Array<{ id: MobileTab; label: string }> = [
+  { id: 'write', label: 'Write' },
+  { id: 'preview', label: 'Preview' },
+  { id: 'outline', label: 'Outline' },
+  { id: 'files', label: 'Files' },
+]
+
+const statusLabels: Record<SaveStatus, string> = {
+  'local-only': 'Local Only',
+  unsaved: 'Unsaved Changes',
+  saving: 'Saving',
+  saved: 'Saved',
+  synced: 'Synced',
+  error: 'Error',
+}
+
+function buildOutline(markdown: string): OutlineItem[] {
+  return markdown
+    .split('\n')
+    .map((line, index) => {
+      const match = line.match(/^(#{1,6})\s+(.+)$/)
+      if (!match) {
+        return null
+      }
+      const text = match[2].replace(/[#*_`]/g, '').trim()
+      return {
+        id: `${index}-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        text,
+        level: match[1].length,
+        line: index + 1,
+      }
+    })
+    .filter(Boolean) as OutlineItem[]
+}
+
+function countWords(markdown: string): number {
+  return markdown.trim() ? markdown.trim().split(/\s+/).length : 0
+}
+
+function downloadFile(filename: string, mimeType: string, content: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function useIsMobileViewport(): boolean {
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia('(max-width: 767px)').matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleChange = () => setIsMobileViewport(mediaQuery.matches)
+    handleChange()
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+
+  return isMobileViewport
+}
 
 export function EditorShellPage() {
-  const mobileTab = useAppStore((state) => state.mobileTab)
-  const editorMode = useAppStore((state) => state.editorMode)
-  const setMobileTab = useAppStore((state) => state.setMobileTab)
-  const setEditorMode = useAppStore((state) => state.setEditorMode)
-  const theme = useAppStore((state) => state.theme)
-  const setTheme = useAppStore((state) => state.setTheme)
-  const draftMarkdown = useAppStore((state) => state.draftMarkdown)
-  const isHydrated = useAppStore((state) => state.isHydrated)
-  const hydrateDocument = useAppStore((state) => state.hydrateDocument)
-  const persistDraft = useAppStore((state) => state.persistDraft)
-  const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+  const editorRef = useRef<MarkdownEditorHandle | null>(null)
+  const previewScrollRef = useRef<HTMLDivElement | null>(null)
+  const pendingPreviewLineRef = useRef<number | null>(null)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareError, setShareError] = useState<string | null>(null)
+  const [isShareOpen, setIsShareOpen] = useState(false)
+  const [isInsertOpen, setIsInsertOpen] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [fileSearch, setFileSearch] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+  const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('documents')
+
   const activeDocId = useAppStore((state) => state.activeDocId)
   const activeShareId = useAppStore((state) => state.activeShareId)
+  const documents = useAppStore((state) => state.documents)
+  const draftTitle = useAppStore((state) => state.draftTitle)
+  const draftMarkdown = useAppStore((state) => state.draftMarkdown)
   const lastLocalSavedMarkdown = useAppStore((state) => state.lastLocalSavedMarkdown)
-  const lastCloudSavedMarkdown = useAppStore((state) => state.lastCloudSavedMarkdown)
-  const setLastCloudSavedMarkdown = useAppStore((state) => state.setLastCloudSavedMarkdown)
+  const theme = useAppStore((state) => state.theme)
+  const mobileTab = useAppStore((state) => state.mobileTab)
+  const desktopViewMode = useAppStore((state) => state.desktopViewMode)
+  const saveStatus = useAppStore((state) => state.saveStatus)
+  const saveError = useAppStore((state) => state.saveError)
+  const hydrateDocument = useAppStore((state) => state.hydrateDocument)
+  const refreshDocuments = useAppStore((state) => state.refreshDocuments)
+  const setDraftTitle = useAppStore((state) => state.setDraftTitle)
+  const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+  const setTheme = useAppStore((state) => state.setTheme)
+  const setMobileTab = useAppStore((state) => state.setMobileTab)
+  const setDesktopViewMode = useAppStore((state) => state.setDesktopViewMode)
+  const createNewDraft = useAppStore((state) => state.createNewDraft)
+  const openDocument = useAppStore((state) => state.openDocument)
+  const importMarkdownDraft = useAppStore((state) => state.importMarkdownDraft)
+  const saveDraft = useAppStore((state) => state.saveDraft)
   const linkActiveShare = useAppStore((state) => state.linkActiveShare)
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [shareUrl, setShareUrl] = useState<string | null>(null)
-  const [publishError, setPublishError] = useState<string | null>(null)
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const setLastCloudSavedSnapshot = useAppStore((state) => state.setLastCloudSavedSnapshot)
 
   const deferredMarkdown = useDeferredValue(draftMarkdown)
-
-  const currentShareUrl =
-    activeShareId && typeof window !== 'undefined'
-      ? `${window.location.origin}/share/${activeShareId}`
-      : activeShareId
-        ? `/share/${activeShareId}`
-        : null
-  const hasUnsavedLocalChanges = draftMarkdown !== lastLocalSavedMarkdown
-  const isCloudSynced =
-    Boolean(activeShareId) && !hasUnsavedLocalChanges && draftMarkdown === (lastCloudSavedMarkdown ?? '')
-  const cloudStatusLabel = hasUnsavedLocalChanges
-    ? 'Unsaved Changes'
-    : isCloudSynced
-      ? 'Synced to Cloud'
-      : 'Local Only'
+  const outline = useMemo(() => buildOutline(draftMarkdown), [draftMarkdown])
+  const lines = useMemo(() => draftMarkdown.split('\n').length, [draftMarkdown])
+  const words = useMemo(() => countWords(draftMarkdown), [draftMarkdown])
+  const filteredDocuments = useMemo(
+    () =>
+      documents.filter((doc) =>
+        doc.title.toLowerCase().includes(fileSearch.trim().toLowerCase()),
+      ),
+    [documents, fileSearch],
+  )
+  const markdownOk = saveStatus === 'error' ? 'Check errors' : 'Markdown OK'
+  const isMobileViewport = useIsMobileViewport()
+  const showSidebar = true
+  const showEditor = desktopViewMode === 'edit' || desktopViewMode === 'split'
+  const showPreview = desktopViewMode === 'preview' || desktopViewMode === 'split'
 
   useEffect(() => {
     void hydrateDocument()
-  }, [hydrateDocument])
+    void refreshDocuments()
+  }, [hydrateDocument, refreshDocuments])
+
+  useEffect(() => listenToAuthState(setUser), [])
 
   useEffect(() => {
-    setShareUrl(currentShareUrl)
-  }, [currentShareUrl])
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges()) {
+        return
+      }
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!activeShareId) {
+      setShareUrl(null)
       return
     }
-    const timeout = window.setTimeout(() => {
-      void persistDraft()
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [draftMarkdown, isHydrated, persistDraft])
+    const path = `/share/${activeShareId}`
+    setShareUrl(typeof window !== 'undefined' ? `${window.location.origin}${path}` : path)
+  }, [activeShareId])
 
-  async function handleSaveAsNew() {
-    setPublishError(null)
-    setCopyState('idle')
-    setIsPublishing(true)
-
-    try {
-      const result = await publishSharedDocument({
-        markdown: draftMarkdown,
-        sourceDocId: activeDocId ?? undefined,
-      })
-      linkActiveShare(result.shareId, draftMarkdown)
-      setLastCloudSavedMarkdown(draftMarkdown)
-    } catch {
-      setPublishError('Unable to publish right now. Please try again.')
-    } finally {
-      setIsPublishing(false)
+  useEffect(() => {
+    if (!showPreview || pendingPreviewLineRef.current === null) {
+      return
     }
+    requestAnimationFrame(() => {
+      scrollPreviewToLine(pendingPreviewLineRef.current)
+    })
+  }, [deferredMarkdown, showPreview])
+
+  useEffect(() => {
+    if (!pendingInsertAction || mobileTab !== 'write') {
+      return
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (!editorRef.current) {
+        return
+      }
+      editorRef.current.applyAction(pendingInsertAction)
+      setPendingInsertAction(null)
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [mobileTab, pendingInsertAction])
+
+  async function guardedOpenDocument(docId: string) {
+    if (hasUnsavedChanges() && !window.confirm('You have unsaved changes. Save before leaving?')) {
+      return
+    }
+    await openDocument(docId)
   }
 
-  async function handleUpdateShare() {
-    if (!activeShareId) {
+  function handleInsert(action: MarkdownInsertAction) {
+    setIsInsertOpen(false)
+    setMobileTab('write')
+    if (editorRef.current) {
+      editorRef.current.applyAction(action)
       return
     }
-    setPublishError(null)
-    setCopyState('idle')
-    setIsPublishing(true)
+    setPendingInsertAction(action)
+  }
 
+  function handleRedo() {
+    editorRef.current?.redo()
+  }
+
+  function handleUndo() {
+    editorRef.current?.undo()
+  }
+
+  function handleOutlineSelect(item: OutlineItem) {
+    if (mobileTab === 'outline') {
+      setMobileTab('write')
+    }
+    if (desktopViewMode !== 'split') {
+      setDesktopViewMode('split')
+    }
+    pendingPreviewLineRef.current = item.line
+    requestAnimationFrame(() => {
+      editorRef.current?.scrollToLine(item.line)
+      scrollPreviewToLine(item.line)
+    })
+  }
+
+  function scrollPreviewToLine(lineNumber: number | null) {
+    if (lineNumber === null) {
+      return
+    }
+    const container = previewScrollRef.current
+    const target = container?.querySelector<HTMLElement>(`[data-source-line="${lineNumber}"]`)
+    if (!container || !target) {
+      return
+    }
+    const containerRect = container.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const nextTop = targetRect.top - containerRect.top + container.scrollTop - container.clientHeight * 0.2
+    container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' })
+    pendingPreviewLineRef.current = null
+  }
+
+  async function handleSave() {
+    await saveDraft()
+  }
+
+  async function handleSharePublish() {
+    setShareError(null)
+    setCopyState('idle')
+
+    if (!user) {
+      setShareError('Sign in with Google to share documents.')
+      return
+    }
+
+    setIsSharing(true)
     try {
-      await updateSharedDocument(activeShareId, {
-        markdown: draftMarkdown,
-        sourceDocId: activeDocId ?? undefined,
-      })
-      setLastCloudSavedMarkdown(draftMarkdown)
+      const doc = await saveDraft()
+      if (activeShareId) {
+        await updateSharedDocument(activeShareId, {
+          title: draftTitle,
+          markdown: draftMarkdown,
+          sourceDocId: doc.id,
+        })
+        setLastCloudSavedSnapshot(draftTitle, draftMarkdown)
+      } else {
+        const result = await publishSharedDocument({
+          title: draftTitle,
+          markdown: draftMarkdown,
+          sourceDocId: doc.id,
+          owner: getOwnerProfile(user),
+        })
+        linkActiveShare(result.shareId, draftTitle, draftMarkdown)
+      }
     } catch {
-      setPublishError('Unable to update right now. Please try again.')
+      setShareError('Unable to share document. Please try again.')
     } finally {
-      setIsPublishing(false)
+      setIsSharing(false)
     }
   }
 
   async function handleCopyShareUrl() {
-    if (!currentShareUrl) {
-      return
-    }
-    if (!navigator.clipboard) {
+    if (!shareUrl || !navigator.clipboard) {
       setCopyState('failed')
       return
     }
     try {
-      await navigator.clipboard.writeText(currentShareUrl)
+      await navigator.clipboard.writeText(shareUrl)
       setCopyState('copied')
     } catch {
       setCopyState('failed')
     }
   }
 
+  async function handleSignIn() {
+    setAuthError(null)
+    try {
+      await signInWithGoogle()
+    } catch {
+      setAuthError('Unable to sign in with Google.')
+    }
+  }
+
+  async function handleSignOut() {
+    setAuthError(null)
+    try {
+      await signOutCurrentUser()
+    } catch {
+      setAuthError('Unable to sign out right now.')
+    }
+  }
+
+  function handleImportClick() {
+    importInputRef.current?.click()
+  }
+
+  async function handleImportFile(file: File | undefined) {
+    setImportError(null)
+    if (!file) {
+      return
+    }
+    if (!file.name.toLowerCase().endsWith('.md')) {
+      setImportError('Only .md files are supported right now.')
+      return
+    }
+    const text = await file.text()
+    importMarkdownDraft(file.name, text)
+  }
+
+  function handleExport(format: 'md' | 'html' | 'pdf') {
+    const filename = draftTitle.trim().replace(/[\\/:*?"<>|]+/g, '-') || 'document'
+    if (format === 'md') {
+      downloadFile(`${filename}.md`, 'text/markdown;charset=utf-8', draftMarkdown)
+      return
+    }
+    if (format === 'html') {
+      downloadFile(
+        `${filename}.html`,
+        'text/html;charset=utf-8',
+        `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(draftTitle)}</title></head><body><pre>${escapeHtml(draftMarkdown)}</pre></body></html>`,
+      )
+      return
+    }
+    window.print()
+  }
+
   return (
-    <AppShellLayout
-      title="Markdown Studio"
-      subtitle={editorMode === 'docs' ? 'Read only view' : 'Editor'}
-      shellClassName={editorMode === 'edit' ? 'shell-edit-mode' : undefined}
-      actions={
-        <div className="topbar-actions">
-          <label className="theme-select-label">
-            Theme
-            <select value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
-              <option value="github-light">GitHub Light</option>
-              <option value="dracula">Dracula</option>
-              <option value="lavender-fields">Lavender Fields</option>
-              <option value="blue-eclipse">Blue Eclipse</option>
-              <option value="lush-forest">Lush Forest</option>
-              <option value="ink-wash">Ink Wash</option>
-              <option value="cherry-blossom">Cherry Blossom</option>
-            </select>
-          </label>
-          {activeShareId ? (
-            <button type="button" className="primary-button" onClick={() => void handleUpdateShare()} disabled={isPublishing}>
-              {isPublishing ? 'Updating...' : 'Update'}
-            </button>
-          ) : null}
-          <button type="button" className="primary-button" onClick={() => void handleSaveAsNew()} disabled={isPublishing}>
-            {isPublishing ? 'Saving...' : 'Save as New'}
-          </button>
-          {activeShareId ? (
-            <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
-              Copy Link
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => setEditorMode(editorMode === 'edit' ? 'docs' : 'edit')}
-          >
-            {editorMode === 'edit' ? 'Read only view' : 'Back to Edit'}
-          </button>
-        </div>
-      }
-    >
-      {publishError ? (
-        <section className="publish-banner publish-banner-error" role="status">
-          {publishError}
-        </section>
-      ) : null}
-      <section className="publish-banner" role="status">
-        <span>
-          Status: <strong>{cloudStatusLabel}</strong>
-        </span>
-      </section>
-      {shareUrl && activeShareId ? (
-        <section className="publish-banner" role="status">
-          <span>
-            Shared link: <a href={shareUrl}>{shareUrl}</a>
+    <main className={`studio-shell studio-mode-${desktopViewMode}`}>
+      <input
+        ref={importInputRef}
+        className="visually-hidden"
+        type="file"
+        accept=".md,text/markdown"
+        onChange={(event) => void handleImportFile(event.target.files?.[0])}
+      />
+
+      <header className="studio-topbar">
+        <div className="brand-lockup">
+          <span className="app-mark" aria-hidden="true">
+            <Edit3 size={18} />
           </span>
-          {copyState === 'copied' ? <span>Copied</span> : null}
-          {copyState === 'failed' ? <span>Copy failed</span> : null}
-        </section>
-      ) : null}
-      {editorMode === 'edit' ? (
-        <>
-          <div className="mobile-tabs">
+          <strong>Markdown Studio</strong>
+        </div>
+        <input
+          className="title-input"
+          value={draftTitle}
+          onChange={(event) => setDraftTitle(event.target.value)}
+          aria-label="Document title"
+        />
+        <span className={`save-badge save-badge-${saveStatus}`}>
+          {statusLabels[saveStatus]}
+        </span>
+        <nav className="view-switch" aria-label="View mode">
+          {(['edit', 'split', 'preview'] as DesktopViewMode[]).map((mode) => (
             <button
+              key={mode}
               type="button"
-              className={mobileTab === 'edit' ? 'tab-button tab-button-active' : 'tab-button'}
-              onClick={() => setMobileTab('edit')}
+              className={desktopViewMode === mode ? 'view-switch-button active' : 'view-switch-button'}
+              onClick={() => setDesktopViewMode(mode)}
             >
-              Edit
+              {mode[0].toUpperCase() + mode.slice(1)}
             </button>
-            <button
-              type="button"
-              className={mobileTab === 'preview' ? 'tab-button tab-button-active' : 'tab-button'}
-              onClick={() => setMobileTab('preview')}
-            >
-              Preview
-            </button>
+          ))}
+        </nav>
+        <div className="topbar-spacer" />
+        <button type="button" className="icon-button" aria-label="Search">
+          <Search size={18} />
+        </button>
+        <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
+          <option value="github-light">GitHub Light</option>
+          <option value="github-dark">GitHub Dark</option>
+          <option value="dracula">Dracula</option>
+        </select>
+        <button type="button" className="secondary-button" onClick={() => setIsShareOpen(true)}>
+          <Share2 size={16} />
+          Share
+        </button>
+        <div className="export-menu">
+          <button type="button" className="secondary-button">
+            <Download size={16} />
+            Export
+          </button>
+          <div className="export-popover">
+            <button type="button" onClick={() => handleExport('md')}>Markdown</button>
+            <button type="button" onClick={() => handleExport('html')}>HTML</button>
+            <button type="button" onClick={() => handleExport('pdf')}>PDF</button>
           </div>
+        </div>
+        {user ? (
+          <button type="button" className="avatar-button" onClick={() => void handleSignOut()} aria-label="Sign out">
+            {user.photoURL ? <img src={user.photoURL} alt="" /> : <UserCircle size={20} />}
+          </button>
+        ) : (
+          <button type="button" className="secondary-button compact" onClick={() => void handleSignIn()}>
+            <LogIn size={16} />
+            Sign in
+          </button>
+        )}
+      </header>
 
-          <section className="split-layout">
-            <article className="panel">
-              <div className="placeholder-surface">
-                <h2>Editor</h2>
-                <textarea
-                  value={draftMarkdown}
-                  onChange={(event) => setDraftMarkdown(event.target.value)}
-                  className="editor-input"
-                  aria-label="Markdown input"
+      <header className="mobile-topbar">
+        <div className="mobile-title-block">
+          <strong>{mobileTab === 'files' ? 'Markdown Studio' : draftTitle}</strong>
+        </div>
+        <span className={`save-badge save-badge-${saveStatus}`}>{statusLabels[saveStatus]}</span>
+        <button type="button" className="icon-button" aria-label="More options">
+          <MoreVertical size={20} />
+        </button>
+      </header>
+      <nav className="mobile-mode-tabs" aria-label="Mobile mode">
+        {mobileTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={mobileTab === tab.id ? 'mobile-mode-tab active' : 'mobile-mode-tab'}
+            onClick={() => setMobileTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {authError ? <div className="studio-banner error">{authError}</div> : null}
+      {saveError ? <div className="studio-banner error">{saveError}</div> : null}
+      {importError ? <div className="studio-banner error">{importError}</div> : null}
+
+      <section className="studio-workspace">
+        {showSidebar ? (
+          <aside className="desktop-sidebar">
+            <div className="sidebar-tabs">
+              <button
+                type="button"
+                className={desktopSidebarTab === 'documents' ? 'sidebar-tab active' : 'sidebar-tab'}
+                onClick={() => setDesktopSidebarTab('documents')}
+              >
+                <FileText size={16} />
+                Documents
+              </button>
+              <button
+                type="button"
+                className={desktopSidebarTab === 'outline' ? 'sidebar-tab active' : 'sidebar-tab'}
+                onClick={() => setDesktopSidebarTab('outline')}
+              >
+                <BookOpen size={16} />
+                Outline
+              </button>
+            </div>
+            {desktopSidebarTab === 'documents' ? (
+              <>
+                <div className="sidebar-actions">
+                  <button type="button" className="primary-button" onClick={createNewDraft}>
+                    <Plus size={18} />
+                    New
+                  </button>
+                  <button type="button" className="icon-button bordered" onClick={handleImportClick} aria-label="Import .md">
+                    <Upload size={18} />
+                  </button>
+                </div>
+                <DocumentList
+                  documents={filteredDocuments}
+                  activeDocId={activeDocId}
+                  onOpen={(id) => void guardedOpenDocument(id)}
                 />
-              </div>
+              </>
+            ) : (
+              <Outline outline={outline} onSelect={handleOutlineSelect} />
+            )}
+          </aside>
+        ) : null}
+
+        <section className="desktop-main-panels">
+          {!isMobileViewport && showEditor ? (
+            <article className="workspace-panel editor-panel">
+              <PanelHeader title="Editor" />
+              <EditorToolbar onInsert={handleInsert} onRedo={handleRedo} onUndo={handleUndo} />
+              <MarkdownEditor ref={editorRef} value={draftMarkdown} onChange={setDraftMarkdown} />
             </article>
-            <article className="panel">
-              <div className="placeholder-surface">
-                <h2>Preview</h2>
+          ) : null}
+          {!isMobileViewport && showPreview ? (
+            <article className="workspace-panel preview-panel">
+              <PanelHeader title="Preview" />
+              <div className="preview-scroll" ref={previewScrollRef}>
                 <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
               </div>
             </article>
-          </section>
+          ) : null}
+        </section>
 
-          <section className="mobile-panel">
-            <div className="placeholder-surface">
-              <h2>{mobileTab === 'edit' ? 'Editor' : 'Preview'}</h2>
-              {mobileTab === 'edit' ? (
-                <textarea
-                  value={draftMarkdown}
-                  onChange={(event) => setDraftMarkdown(event.target.value)}
-                  className="editor-input"
-                  aria-label="Markdown input mobile"
-                />
+        <section className="mobile-panel-surface">
+          {isMobileViewport && mobileTab === 'write' ? (
+            <>
+              <EditorToolbar onInsert={handleInsert} onRedo={handleRedo} onUndo={handleUndo} compact />
+              <MarkdownEditor ref={editorRef} value={draftMarkdown} onChange={setDraftMarkdown} />
+              <div className="mobile-status-strip">Words: {words} · Lines: {lines} · {markdownOk}</div>
+            </>
+          ) : null}
+          {isMobileViewport && mobileTab === 'preview' ? (
+            <div className="preview-scroll mobile-preview">
+              <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
+            </div>
+          ) : null}
+          {isMobileViewport && mobileTab === 'outline' ? <Outline outline={outline} mobile onSelect={handleOutlineSelect} /> : null}
+          {isMobileViewport && mobileTab === 'files' ? (
+            <FilesView
+              documents={filteredDocuments}
+              activeDocId={activeDocId}
+              search={fileSearch}
+              onSearch={setFileSearch}
+              onNew={createNewDraft}
+              onImport={handleImportClick}
+              onOpen={(id) => void guardedOpenDocument(id)}
+            />
+          ) : null}
+        </section>
+      </section>
+
+      <footer className="status-bar">
+        <span>Words: {words}</span>
+        <span>Lines: {lines}</span>
+        <span>Markdown OK</span>
+        <span>{statusLabels[saveStatus]}</span>
+        <span className="status-fill" />
+        <span>{lastLocalSavedMarkdown === draftMarkdown ? '100%' : 'Edited'}</span>
+      </footer>
+
+      <footer className="mobile-bottom-bar">
+        <button type="button" className="bottom-action primary" onClick={() => void handleSave()}>
+          <Save size={18} />
+          Save
+        </button>
+        <button type="button" className="bottom-action" onClick={() => setMobileTab('preview')}>
+          <Eye size={18} />
+          Preview
+        </button>
+        <button type="button" className="bottom-action" onClick={() => setIsInsertOpen(true)}>
+          <Plus size={18} />
+          Insert
+        </button>
+        <button type="button" className="bottom-action" onClick={() => setIsShareOpen(true)}>
+          <Share2 size={18} />
+          Share
+        </button>
+      </footer>
+
+      {isShareOpen ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setIsShareOpen(false)}>
+          <section
+            className="dialog-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="share-title">Share document</h2>
+            <p>Anyone with this link can view this document. Only the creator can edit the original.</p>
+            {shareError ? <p className="error-text">{shareError}</p> : null}
+            {shareUrl ? (
+              <div className="share-link-row">
+                <input value={shareUrl} readOnly aria-label="Read-only share link" />
+                <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
+                  <Copy size={16} />
+                  Copy Link
+                </button>
+              </div>
+            ) : null}
+            {copyState === 'copied' ? <p className="success-text">Link copied</p> : null}
+            {copyState === 'failed' ? <p className="error-text">Copy failed</p> : null}
+            <div className="dialog-actions">
+              {!user ? (
+                <button type="button" className="secondary-button" onClick={() => void handleSignIn()}>
+                  <LogIn size={16} />
+                  Sign in with Google
+                </button>
               ) : (
-                <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
+                <button type="button" className="secondary-button" onClick={() => void handleSignOut()}>
+                  <LogOut size={16} />
+                  Sign out
+                </button>
               )}
+              <button type="button" className="primary-button" onClick={() => void handleSharePublish()} disabled={isSharing}>
+                <Share2 size={16} />
+                {isSharing ? 'Sharing...' : activeShareId ? 'Update Link' : 'Create Link'}
+              </button>
             </div>
           </section>
+        </div>
+      ) : null}
+
+      {isInsertOpen ? (
+        <div className="modal-backdrop mobile-only" role="presentation" onMouseDown={() => setIsInsertOpen(false)}>
+          <section className="bottom-sheet" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            <h2>Insert Markdown</h2>
+            <EditorToolbar onInsert={handleInsert} sheet />
+          </section>
+        </div>
+      ) : null}
+    </main>
+  )
+}
+
+function PanelHeader({ title }: { title: string }) {
+  return (
+    <div className="panel-header">
+      <h2>{title}</h2>
+    </div>
+  )
+}
+
+function EditorToolbar({
+  onInsert,
+  onRedo,
+  onUndo,
+  compact = false,
+  sheet = false,
+}: {
+  onInsert: (action: MarkdownInsertAction) => void
+  onRedo?: () => void
+  onUndo?: () => void
+  compact?: boolean
+  sheet?: boolean
+}) {
+  return (
+    <div className={sheet ? 'insert-grid' : compact ? 'editor-toolbar compact' : 'editor-toolbar'}>
+      {!sheet ? (
+        <>
+          <button
+            type="button"
+            className="toolbar-button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onUndo}
+            aria-label="Undo"
+            title="Undo"
+          >
+            <Undo2 size={17} />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onRedo}
+            aria-label="Redo"
+            title="Redo"
+          >
+            <Redo2 size={17} />
+          </button>
         </>
+      ) : null}
+      {toolbarItems.map((item) => {
+        const Icon = item.icon
+        return (
+          <button
+            key={item.action}
+            type="button"
+            className={sheet ? 'insert-action' : 'toolbar-button'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onInsert(item.action)}
+            aria-label={item.label}
+            title={item.label}
+          >
+            <Icon size={sheet ? 18 : 17} />
+            {sheet ? <span>{item.label}</span> : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function DocumentList({
+  documents,
+  activeDocId,
+  onOpen,
+}: {
+  documents: ReturnType<typeof useAppStore.getState>['documents']
+  activeDocId: string | null
+  onOpen: (id: string) => void
+}) {
+  return (
+    <section className="sidebar-section">
+      <h2>Recent Documents</h2>
+      <div className="document-list">
+        {documents.slice(0, 6).map((doc) => (
+          <button
+            key={doc.id}
+            type="button"
+            className={doc.id === activeDocId ? 'document-row active' : 'document-row'}
+            onClick={() => onOpen(doc.id)}
+          >
+            <FileText size={17} />
+            <span>{doc.title}</span>
+            <small>{new Date(doc.updatedAt).toLocaleDateString()}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function Outline({
+  outline,
+  mobile = false,
+  onSelect,
+}: {
+  outline: OutlineItem[]
+  mobile?: boolean
+  onSelect: (item: OutlineItem) => void
+}) {
+  return (
+    <section className={mobile ? 'outline-panel mobile' : 'sidebar-section outline-panel'}>
+      <h2>Outline</h2>
+      {outline.length ? (
+        <div className="outline-list">
+          {outline.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`outline-row outline-level-${item.level}`}
+              onClick={() => onSelect(item)}
+            >
+              <span>{item.text}</span>
+              <small>H{item.level}</small>
+            </button>
+          ))}
+        </div>
       ) : (
-        <section className="docs-mode-panel">
-          <MarkdownPreview markdown={deferredMarkdown} theme={theme} />
-        </section>
+        <p className="muted-text">No headings yet.</p>
       )}
-    </AppShellLayout>
+    </section>
+  )
+}
+
+function FilesView({
+  documents,
+  activeDocId,
+  search,
+  onSearch,
+  onNew,
+  onImport,
+  onOpen,
+}: {
+  documents: ReturnType<typeof useAppStore.getState>['documents']
+  activeDocId: string | null
+  search: string
+  onSearch: (value: string) => void
+  onNew: () => void
+  onImport: () => void
+  onOpen: (id: string) => void
+}) {
+  return (
+    <div className="files-view">
+      <label className="file-search">
+        <Search size={18} />
+        <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search documents" />
+      </label>
+      <button type="button" className="primary-button full-width" onClick={onNew}>
+        <Plus size={18} />
+        New Document
+      </button>
+      <button type="button" className="secondary-button full-width" onClick={onImport}>
+        <Upload size={18} />
+        Import .md file only
+      </button>
+      <section className="mobile-document-list">
+        <div className="section-title-row">
+          <h2>Recent Documents</h2>
+          <button type="button">View all</button>
+        </div>
+        {documents.map((doc) => (
+          <button
+            key={doc.id}
+            type="button"
+            className={doc.id === activeDocId ? 'mobile-document-row active' : 'mobile-document-row'}
+            onClick={() => onOpen(doc.id)}
+          >
+            <FileText size={28} />
+            <span>{doc.title}</span>
+            <small>{new Date(doc.updatedAt).toLocaleDateString()} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB</small>
+            <MoreVertical size={18} />
+          </button>
+        ))}
+      </section>
+      <div className="info-callout">
+        <strong>Import supports .md files only.</strong>
+        <span>Images must be added by URL.</span>
+      </div>
+    </div>
   )
 }

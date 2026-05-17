@@ -26,6 +26,14 @@ describe('MarkdownPreview', () => {
     expect(screen.getByText('Bold text').tagName).toBe('STRONG')
   })
 
+  it('adds source line metadata to headings for outline navigation', () => {
+    const markdown = '# Heading 1\n\nBody\n\n## Heading 2'
+    render(<MarkdownPreview markdown={markdown} theme="github-light" />)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Heading 1' })).toHaveAttribute('data-source-line', '1')
+    expect(screen.getByRole('heading', { level: 2, name: 'Heading 2' })).toHaveAttribute('data-source-line', '5')
+  })
+
   it('renders math using KaTeX', () => {
     const markdown = 'Inline math: $E=mc^2$\n\nBlock math:\n\n$$\n\\int x dx\n$$'
     render(<MarkdownPreview markdown={markdown} theme="github-light" />)

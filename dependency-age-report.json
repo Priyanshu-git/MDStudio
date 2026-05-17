@@ -1,0 +1,263 @@
+{
+  "cutoff": "2026-04-12T23:59:59.999Z",
+  "updates": {
+    "@codemirror/lang-markdown": {
+      "section": "dependencies",
+      "fromRange": "^6.5.0",
+      "toVersion": "6.5.0"
+    },
+    "@codemirror/state": {
+      "section": "dependencies",
+      "fromRange": "^6.6.0",
+      "toVersion": "6.6.0"
+    },
+    "@codemirror/theme-one-dark": {
+      "section": "dependencies",
+      "fromRange": "^6.1.3",
+      "toVersion": "6.1.3"
+    },
+    "dexie": {
+      "section": "dependencies",
+      "fromRange": "^4.4.2",
+      "toVersion": "4.4.2"
+    },
+    "firebase": {
+      "section": "dependencies",
+      "fromRange": "*",
+      "toVersion": "12.12.0"
+    },
+    "mermaid": {
+      "section": "dependencies",
+      "fromRange": "^11.14.0",
+      "toVersion": "11.14.0"
+    },
+    "react": {
+      "section": "dependencies",
+      "fromRange": "^18.3.1",
+      "toVersion": "18.3.1"
+    },
+    "react-dom": {
+      "section": "dependencies",
+      "fromRange": "^18.3.1",
+      "toVersion": "18.3.1"
+    },
+    "react-markdown": {
+      "section": "dependencies",
+      "fromRange": "^10.1.0",
+      "toVersion": "10.1.0"
+    },
+    "rehype-katex": {
+      "section": "dependencies",
+      "fromRange": "^7.0.1",
+      "toVersion": "7.0.1"
+    },
+    "remark-gfm": {
+      "section": "dependencies",
+      "fromRange": "^4.0.1",
+      "toVersion": "4.0.1"
+    },
+    "remark-math": {
+      "section": "dependencies",
+      "fromRange": "^6.0.0",
+      "toVersion": "6.0.0"
+    },
+    "shiki": {
+      "section": "dependencies",
+      "fromRange": "^4.0.2",
+      "toVersion": "4.0.2"
+    },
+    "@eslint/js": {
+      "section": "devDependencies",
+      "fromRange": "^9.9.0",
+      "toVersion": "9.39.4"
+    },
+    "@testing-library/jest-dom": {
+      "section": "devDependencies",
+      "fromRange": "^6.9.1",
+      "toVersion": "6.9.1"
+    },
+    "@testing-library/react": {
+      "section": "devDependencies",
+      "fromRange": "^16.3.2",
+      "toVersion": "16.3.2"
+    },
+    "@types/react": {
+      "section": "devDependencies",
+      "fromRange": "^18.3.3",
+      "toVersion": "18.3.28"
+    },
+    "@types/react-dom": {
+      "section": "devDependencies",
+      "fromRange": "^18.3.0",
+      "toVersion": "18.3.7"
+    },
+    "@vitejs/plugin-react": {
+      "section": "devDependencies",
+      "fromRange": "^4.3.1",
+      "toVersion": "4.7.0"
+    },
+    "eslint": {
+      "section": "devDependencies",
+      "fromRange": "^9.9.0",
+      "toVersion": "9.39.4"
+    },
+    "eslint-plugin-react-refresh": {
+      "section": "devDependencies",
+      "fromRange": "^0.4.9",
+      "toVersion": "0.4.26"
+    },
+    "fake-indexeddb": {
+      "section": "devDependencies",
+      "fromRange": "^6.2.5",
+      "toVersion": "6.2.5"
+    },
+    "globals": {
+      "section": "devDependencies",
+      "fromRange": "^15.9.0",
+      "toVersion": "15.15.0"
+    },
+    "jsdom": {
+      "section": "devDependencies",
+      "fromRange": "^24.1.0",
+      "toVersion": "24.1.3"
+    },
+    "tailwindcss": {
+      "section": "devDependencies",
+      "fromRange": "^3.4.14",
+      "toVersion": "3.4.19"
+    },
+    "typescript": {
+      "section": "devDependencies",
+      "fromRange": "^5.5.3",
+      "toVersion": "5.9.3"
+    },
+    "typescript-eslint": {
+      "section": "devDependencies",
+      "fromRange": "^8.0.1",
+      "toVersion": "8.58.1"
+    },
+    "vite": {
+      "section": "devDependencies",
+      "fromRange": "^5.4.1",
+      "toVersion": "5.4.21"
+    },
+    "vite-plugin-pwa": {
+      "section": "devDependencies",
+      "fromRange": "^0.20.5",
+      "toVersion": "0.20.5"
+    },
+    "vitest": {
+      "section": "devDependencies",
+      "fromRange": "^1.6.0",
+      "toVersion": "1.6.1"
+    }
+  },
+  "exceptions": [
+    {
+      "section": "dependencies",
+      "name": "@codemirror/view",
+      "wanted": "^6.42.1",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "dependencies",
+      "name": "react-router-dom",
+      "wanted": "^7.15.0",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "dependencies",
+      "name": "zustand",
+      "wanted": "^5.0.13",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "devDependencies",
+      "name": "autoprefixer",
+      "wanted": "^10.5.0",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "devDependencies",
+      "name": "eslint-plugin-react-hooks",
+      "wanted": "^5.1.0-rc.0",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "devDependencies",
+      "name": "postcss",
+      "wanted": "^8.5.14",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "devDependencies",
+      "name": "prettier",
+      "wanted": "^3.8.3",
+      "reason": "No eligible version satisfying original range before cutoff"
+    },
+    {
+      "section": "devDependencies",
+      "name": "workbox-build",
+      "wanted": "^7.4.1",
+      "reason": "No eligible version satisfying original range before cutoff"
+    }
+  ],
+  "explicitExceptionsApplied": [
+    {
+      "section": "dependencies",
+      "name": "@codemirror/view",
+      "wanted": "^6.42.1",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "6.41.0"
+    },
+    {
+      "section": "dependencies",
+      "name": "react-router-dom",
+      "wanted": "^7.15.0",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "7.14.0"
+    },
+    {
+      "section": "dependencies",
+      "name": "zustand",
+      "wanted": "^5.0.13",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "5.0.12"
+    },
+    {
+      "section": "devDependencies",
+      "name": "autoprefixer",
+      "wanted": "^10.5.0",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "10.4.27"
+    },
+    {
+      "section": "devDependencies",
+      "name": "eslint-plugin-react-hooks",
+      "wanted": "^5.1.0-rc.0",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "7.0.1"
+    },
+    {
+      "section": "devDependencies",
+      "name": "postcss",
+      "wanted": "^8.5.14",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "8.5.9"
+    },
+    {
+      "section": "devDependencies",
+      "name": "prettier",
+      "wanted": "^3.8.3",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "3.8.2"
+    },
+    {
+      "section": "devDependencies",
+      "name": "workbox-build",
+      "wanted": "^7.4.1",
+      "reason": "No eligible version satisfying original range before cutoff",
+      "chosen": "7.4.0"
+    }
+  ]
+}

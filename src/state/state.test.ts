@@ -10,11 +10,18 @@ describe('App Store (Zustand)', () => {
     useAppStore.setState({
       activeDocId: null,
       activeShareId: null,
+      documents: [],
       isHydrated: false,
-      draftMarkdown: '# Welcome to Markdown Studio\n\nPhase 2 shell is ready.',
+      draftTitle: 'Markdown Rendering Test File',
+      draftMarkdown: '# Markdown Rendering Test File',
       theme: 'github-light',
+      mobileTab: 'write',
+      desktopViewMode: 'split',
+      saveStatus: 'local-only',
       lastLocalSavedMarkdown: '',
+      lastLocalSavedTitle: '',
       lastCloudSavedMarkdown: null,
+      lastCloudSavedTitle: null,
     })
   })
 
@@ -23,17 +30,20 @@ describe('App Store (Zustand)', () => {
     
     expect(useAppStore.getState().isHydrated).toBe(true)
     expect(useAppStore.getState().activeDocId).toBeDefined()
-    expect(useAppStore.getState().draftMarkdown).toContain('Welcome to Markdown Studio')
+    expect(useAppStore.getState().draftMarkdown).toContain('Markdown Rendering Test File')
   })
 
-  it('updates draft and persists it', async () => {
+  it('updates draft and saves only when requested', async () => {
     await useAppStore.getState().hydrateDocument()
     const docId = useAppStore.getState().activeDocId!
 
     useAppStore.getState().setDraftMarkdown('# New Content')
-    await useAppStore.getState().persistDraft()
+    let doc = await db.documents.get(docId)
+    expect(doc?.markdown).not.toBe('# New Content')
 
-    const doc = await db.documents.get(docId)
+    await useAppStore.getState().saveDraft()
+
+    doc = await db.documents.get(docId)
     expect(doc?.markdown).toBe('# New Content')
   })
 

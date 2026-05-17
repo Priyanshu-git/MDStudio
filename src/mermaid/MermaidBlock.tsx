@@ -24,11 +24,11 @@ export function MermaidBlock({ code, theme }: MermaidBlockProps) {
 
   useEffect(() => {
     let mounted = true
-    setError(null)
 
     renderMermaid(id, code, theme)
       .then((markup) => {
         if (mounted) {
+          setError(null)
           setSvg(markup)
         }
       })

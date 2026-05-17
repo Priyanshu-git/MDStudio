@@ -1,5 +1,7 @@
 import React from 'react'
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import type { ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -26,6 +28,12 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
         rehypePlugins={[rehypeKatex]}
         urlTransform={(url) => sanitizeUrl(url)}
         components={{
+          h1: HeadingWithSourceLine('h1'),
+          h2: HeadingWithSourceLine('h2'),
+          h3: HeadingWithSourceLine('h3'),
+          h4: HeadingWithSourceLine('h4'),
+          h5: HeadingWithSourceLine('h5'),
+          h6: HeadingWithSourceLine('h6'),
           code(props) {
             const { className, children } = props
             const content = String(children ?? '').replace(/\n$/, '')
@@ -40,7 +48,10 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
               return <CodeBlock language={language} code={content} theme={theme} />
             }
 
-            return <code className={className}>{children}</code>
+            return <code className={className ? className : 'code-inline'}>{children}</code>
+          },
+          img(props) {
+            return <PreviewImage alt={props.alt ?? ''} src={props.src ?? ''} />
           },
         }}
       >
@@ -49,3 +60,27 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
     </article>
   )
 })
+
+function HeadingWithSourceLine(Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') {
+  return function Heading({ node, children, ...props }: React.ComponentProps<typeof Tag> & ExtraProps) {
+    return (
+      <Tag {...props} data-source-line={node?.position?.start.line}>
+        {children}
+      </Tag>
+    )
+  }
+}
+
+function PreviewImage({ alt, src }: { alt: string; src: string }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed || !src) {
+    return (
+      <span className="image-fallback" role="img" aria-label={alt || 'Image failed to load'}>
+        Image could not be loaded from this URL.
+      </span>
+    )
+  }
+
+  return <img alt={alt} src={src} onError={() => setFailed(true)} loading="lazy" />
+}

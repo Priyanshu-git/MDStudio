@@ -1,16 +1,45 @@
 import { db } from './db'
-import type { Document } from '../types'
+import type { Document, ThemeName } from '../types'
 
 const ACTIVE_DOC_KEY = 'activeDocId'
 const THEME_KEY = 'theme'
 
-export async function createDocument(markdown: string): Promise<Document> {
+export type CreateDocumentInput = {
+  title?: string
+  markdown: string
+  theme?: ThemeName
+}
+
+export type UpdateDocumentInput = {
+  title?: string
+  markdown?: string
+  theme?: ThemeName
+}
+
+const DEFAULT_TITLE = 'Untitled Document'
+
+function titleFromMarkdown(markdown: string): string {
+  const heading = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim()
+  return heading || DEFAULT_TITLE
+}
+
+function normalizeDocument(doc: Document): Document {
+  return {
+    ...doc,
+    title: doc.title || titleFromMarkdown(doc.markdown),
+  }
+}
+
+export async function createDocument(input: CreateDocumentInput | string): Promise<Document> {
+  const payload = typeof input === 'string' ? { markdown: input } : input
   const now = Date.now()
   const doc: Document = {
     id: crypto.randomUUID(),
-    markdown,
+    title: payload.title?.trim() || titleFromMarkdown(payload.markdown),
+    markdown: payload.markdown,
     createdAt: now,
     updatedAt: now,
+    ...(payload.theme ? { theme: payload.theme } : {}),
   }
   await db.documents.put(doc)
   await setActiveDocumentId(doc.id)
@@ -18,11 +47,21 @@ export async function createDocument(markdown: string): Promise<Document> {
 }
 
 export async function getDocumentById(id: string): Promise<Document | undefined> {
-  return db.documents.get(id)
+  const doc = await db.documents.get(id)
+  return doc ? normalizeDocument(doc) : undefined
+}
+
+export async function listDocuments(): Promise<Document[]> {
+  const docs = await db.documents.orderBy('updatedAt').reverse().toArray()
+  return docs.map(normalizeDocument)
+}
+
+export async function updateDocument(id: string, input: UpdateDocumentInput): Promise<void> {
+  await db.documents.update(id, { ...input, updatedAt: Date.now() })
 }
 
 export async function updateDocumentMarkdown(id: string, markdown: string): Promise<void> {
-  await db.documents.update(id, { markdown, updatedAt: Date.now() })
+  await updateDocument(id, { markdown })
 }
 
 export async function setActiveDocumentId(id: string): Promise<void> {
@@ -55,8 +94,8 @@ export async function getOrCreateActiveDocument(seedMarkdown: string): Promise<D
   const latest = await db.documents.orderBy('updatedAt').last()
   if (latest) {
     await setActiveDocumentId(latest.id)
-    return latest
+    return normalizeDocument(latest)
   }
 
-  return createDocument(seedMarkdown)
+  return createDocument({ markdown: seedMarkdown, title: titleFromMarkdown(seedMarkdown) })
 }

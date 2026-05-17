@@ -7,9 +7,10 @@
 
 ## Route Contract
 - `/` redirects to `/editor`
-- `/editor` editor and preview shell with mode toggle:
-  - `edit`: split (desktop) / tabbed (mobile) editor+preview
-  - `docs`: full-page read-only documentation preview
+- `/editor` editor and preview shell with desktop mode toggle:
+  - `edit`: editor-only desktop surface
+  - `split`: editor and preview desktop surface
+  - `preview`: preview-only desktop surface
 - `/doc/:id` local document route scaffold
 - `/share/:id` Phase 2 placeholder
 
@@ -25,5 +26,5 @@
 CodeMirror input -> app store -> debounced persistence -> markdown pipeline -> preview renderers.
 
 ## UI Mode State
-- `editorMode: 'edit' | 'docs'` is owned by app state.
-- Docs mode must be read-only and must hide all edit surfaces.
+- `desktopViewMode: 'edit' | 'split' | 'preview'` is owned by app state.
+- `mobileTab: 'write' | 'preview' | 'outline' | 'files'` is owned by app state.

@@ -30,8 +30,14 @@ describe('shareDocuments', () => {
     addDocMock.mockResolvedValue({ id: 'share-123' })
 
     const result = await publishSharedDocument({
+      title: 'Shared',
       markdown: '# Shared',
       sourceDocId: 'local-1',
+      owner: {
+        uid: 'user-1',
+        displayName: 'Ada',
+        email: 'ada@example.com',
+      },
     })
 
     expect(result).toEqual({ shareId: 'share-123' })
@@ -40,6 +46,9 @@ describe('shareDocuments', () => {
     expect(addDocMock.mock.calls[0][1]).toMatchObject({
       markdown: '# Shared',
       sourceDocId: 'local-1',
+      ownerUid: 'user-1',
+      ownerDisplayName: 'Ada',
+      ownerEmail: 'ada@example.com',
     })
   })
 
@@ -49,6 +58,10 @@ describe('shareDocuments', () => {
       exists: () => true,
       data: () => ({
         markdown: '# Remote',
+        title: 'Remote',
+        ownerUid: 'user-1',
+        ownerDisplayName: 'Ada',
+        ownerEmail: 'ada@example.com',
         createdAt: 100,
         updatedAt: 200,
       }),
@@ -59,7 +72,11 @@ describe('shareDocuments', () => {
     expect(docMock).toHaveBeenCalledWith({ mocked: true }, 'sharedDocuments', 'share-abc')
     expect(result).toEqual({
       id: 'share-abc',
+      title: 'Remote',
       markdown: '# Remote',
+      ownerUid: 'user-1',
+      ownerDisplayName: 'Ada',
+      ownerEmail: 'ada@example.com',
       createdAt: 100,
       updatedAt: 200,
       sourceDocId: undefined,
@@ -77,6 +94,7 @@ describe('shareDocuments', () => {
 
   it('updates an existing shared document', async () => {
     await updateSharedDocument('share-777', {
+      title: 'Updated',
       markdown: '# Updated',
       sourceDocId: 'local-2',
     })
@@ -85,6 +103,7 @@ describe('shareDocuments', () => {
     expect(updateDocMock).toHaveBeenCalledTimes(1)
     expect(updateDocMock.mock.calls[0][1]).toMatchObject({
       markdown: '# Updated',
+      title: 'Updated',
       sourceDocId: 'local-2',
     })
     expect(typeof updateDocMock.mock.calls[0][1].updatedAt).toBe('number')

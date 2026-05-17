@@ -1,19 +1,31 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics } from 'firebase/analytics'
 import { getFirestore } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
+
+const requiredFirebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+for (const [key, value] of Object.entries(requiredFirebaseConfig)) {
+  if (!value) {
+    throw new Error(`Missing Firebase environment variable for ${key}`)
+  }
+}
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyARzbJlw-jQrhoAgAfUvqzaK-a_KaXW-bI',
-  authDomain: 'md-studio-7c9d6.firebaseapp.com',
-  projectId: 'md-studio-7c9d6',
-  storageBucket: 'md-studio-7c9d6.firebasestorage.app',
-  messagingSenderId: '722146588921',
-  appId: '1:722146588921:web:b3ecbf0729467111e48a28',
-  measurementId: 'G-LFKQTJMHC1',
+  ...requiredFirebaseConfig,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 
 export const app = initializeApp(firebaseConfig)
 export const firestore = getFirestore(app)
+export const auth = getAuth(app)
 
 function initializeAnalyticsSafely() {
   if (typeof window === 'undefined' || import.meta.env.MODE === 'test') {

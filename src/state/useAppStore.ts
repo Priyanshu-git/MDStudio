@@ -1,72 +1,132 @@
 import { create } from 'zustand'
-import type { ThemeName } from '../types'
+import type {
+  DesktopViewMode,
+  Document,
+  MobileTab,
+  SaveStatus,
+  ThemeName,
+} from '../types'
 import {
-  getThemePreference,
+  createDocument,
+  getDocumentById,
   getOrCreateActiveDocument,
+  getThemePreference,
+  listDocuments,
   setActiveDocumentId,
   setThemePreference,
-  updateDocumentMarkdown,
+  updateDocument,
 } from '../storage/documents'
 
-export type MobileTab = 'edit' | 'preview'
-export type EditorMode = 'edit' | 'docs'
+const DEFAULT_MARKDOWN = `# Markdown Rendering Test File
+
+A comprehensive markdown file to verify rendering support for:
+
+- Core markdown
+- Tables
+- Task lists
+- Code blocks
+- Syntax highlighting
+- Math equations
+- Mermaid diagrams
+- Images
+- Quotes
+- Nested lists
+- Horizontal rules
+- Links
+
+---
+
+## Core markdown features
+
+Here is a code example with syntax highlighting:
+
+\`\`\`javascript
+function greet(name) {
+  const message = \`Hello, \${name}!\`;
+  return message;
+}
+console.log(greet('world'));
+\`\`\`
+
+The famous equation:
+
+$$E = mc^2$$
+
+A mermaid diagram:
+
+\`\`\`mermaid
+graph TD
+  A[Start] --> B{Is it working?}
+  B -- Yes --> C[Great!]
+  B -- No --> D[Debug]
+  D --> B
+\`\`\`
+`
+
+const VALID_THEMES: ThemeName[] = ['github-light', 'github-dark', 'dracula']
 
 type AppState = {
   activeDocId: string | null
   activeShareId: string | null
+  documents: Document[]
+  draftTitle: string
+  draftMarkdown: string
+  lastLocalSavedTitle: string
   lastLocalSavedMarkdown: string
+  lastCloudSavedTitle: string | null
   lastCloudSavedMarkdown: string | null
   isHydrated: boolean
   theme: ThemeName
   mobileTab: MobileTab
-  editorMode: EditorMode
-  draftMarkdown: string
+  desktopViewMode: DesktopViewMode
+  saveStatus: SaveStatus
+  saveError: string | null
   setActiveDocId: (docId: string | null) => void
   setTheme: (theme: ThemeName) => void
   setMobileTab: (tab: MobileTab) => void
-  setEditorMode: (mode: EditorMode) => void
+  setDesktopViewMode: (mode: DesktopViewMode) => void
+  setDraftTitle: (value: string) => void
   setDraftMarkdown: (value: string) => void
-  linkActiveShare: (shareId: string, cloudMarkdown: string) => void
+  linkActiveShare: (shareId: string, title: string, markdown: string) => void
   clearShareLink: () => void
-  setLastCloudSavedMarkdown: (markdown: string | null) => void
-  setLastLocalSavedMarkdown: (markdown: string) => void
+  setLastCloudSavedSnapshot: (title: string | null, markdown: string | null) => void
+  refreshDocuments: () => Promise<void>
   hydrateTheme: () => Promise<void>
   hydrateDocument: () => Promise<void>
-  persistDraft: () => Promise<void>
+  createNewDraft: () => void
+  openDocument: (docId: string) => Promise<void>
+  importMarkdownDraft: (title: string, markdown: string) => void
+  saveDraft: () => Promise<Document>
 }
 
-const VALID_THEMES: ThemeName[] = [
-  'github-light',
-  'dracula',
-  'lavender-fields',
-  'blue-eclipse',
-  'lush-forest',
-  'ink-wash',
-  'cherry-blossom',
-]
+function normalizeTheme(theme: string | null, fallback: ThemeName): ThemeName {
+  return theme && VALID_THEMES.includes(theme as ThemeName) ? (theme as ThemeName) : fallback
+}
+
+function isDraftDirty(state: Pick<AppState, 'draftTitle' | 'draftMarkdown' | 'lastLocalSavedTitle' | 'lastLocalSavedMarkdown'>) {
+  return state.draftTitle !== state.lastLocalSavedTitle || state.draftMarkdown !== state.lastLocalSavedMarkdown
+}
+
+function titleFromFilename(filename: string): string {
+  return filename.replace(/\.md$/i, '').trim() || 'Imported Document'
+}
 
 export const useAppStore = create<AppState>((set, get) => ({
   activeDocId: null,
   activeShareId: null,
+  documents: [],
+  draftTitle: 'Markdown Rendering Test File',
+  draftMarkdown: DEFAULT_MARKDOWN,
+  lastLocalSavedTitle: '',
   lastLocalSavedMarkdown: '',
+  lastCloudSavedTitle: null,
   lastCloudSavedMarkdown: null,
   isHydrated: false,
   theme: 'github-light',
-  mobileTab: 'edit',
-  editorMode: 'edit',
-  draftMarkdown: `# Welcome to Markdown Studio
-
-Markdown Studio is a local-first editor.
-
-| Feature | Status | Priority |
-| :--- | :---: | ---: |
-| Markdown Rendering | ✅ | High |
-| Mermaid Diagrams | ✅ | High |
-| Shiki Highlighting | ✅ | Medium |
-| Local Persistence | ✅ | High |
-| PWA / Offline | ✅ | High |
-
-Phase 2 shell is ready.`,
+  mobileTab: 'write',
+  desktopViewMode: 'split',
+  saveStatus: 'local-only',
+  saveError: null,
   setActiveDocId: (docId) => {
     set({ activeDocId: docId })
     if (docId) {
@@ -78,50 +138,161 @@ Phase 2 shell is ready.`,
     void setThemePreference(theme)
   },
   setMobileTab: (tab) => set({ mobileTab: tab }),
-  setEditorMode: (mode) => set({ editorMode: mode }),
-  setDraftMarkdown: (value) => set({ draftMarkdown: value }),
-  linkActiveShare: (shareId, cloudMarkdown) =>
+  setDesktopViewMode: (mode) => set({ desktopViewMode: mode }),
+  setDraftTitle: (value) => {
+    const next = { ...get(), draftTitle: value }
+    set({
+      draftTitle: value,
+      saveStatus: isDraftDirty(next) ? 'unsaved' : get().activeShareId ? 'synced' : 'saved',
+      saveError: null,
+    })
+  },
+  setDraftMarkdown: (value) => {
+    const next = { ...get(), draftMarkdown: value }
+    set({
+      draftMarkdown: value,
+      saveStatus: isDraftDirty(next) ? 'unsaved' : get().activeShareId ? 'synced' : 'saved',
+      saveError: null,
+    })
+  },
+  linkActiveShare: (shareId, title, markdown) =>
     set({
       activeShareId: shareId,
-      lastCloudSavedMarkdown: cloudMarkdown,
+      lastCloudSavedTitle: title,
+      lastCloudSavedMarkdown: markdown,
+      saveStatus: 'synced',
     }),
   clearShareLink: () =>
     set({
       activeShareId: null,
+      lastCloudSavedTitle: null,
       lastCloudSavedMarkdown: null,
     }),
-  setLastCloudSavedMarkdown: (markdown) => set({ lastCloudSavedMarkdown: markdown }),
-  setLastLocalSavedMarkdown: (markdown) => set({ lastLocalSavedMarkdown: markdown }),
+  setLastCloudSavedSnapshot: (title, markdown) =>
+    set({
+      lastCloudSavedTitle: title,
+      lastCloudSavedMarkdown: markdown,
+      saveStatus: title && markdown ? 'synced' : get().saveStatus,
+    }),
+  refreshDocuments: async () => {
+    const documents = await listDocuments()
+    set({ documents })
+  },
   hydrateTheme: async () => {
     const persistedTheme = await getThemePreference()
-    if (persistedTheme && VALID_THEMES.includes(persistedTheme as ThemeName)) {
-      set({ theme: persistedTheme as ThemeName })
-    }
+    set({ theme: normalizeTheme(persistedTheme, get().theme) })
   },
   hydrateDocument: async () => {
     if (get().isHydrated) {
       return
     }
-    const doc = await getOrCreateActiveDocument(get().draftMarkdown)
+    const doc = await getOrCreateActiveDocument(DEFAULT_MARKDOWN)
     const persistedTheme = await getThemePreference()
-    const resolvedTheme =
-      persistedTheme && VALID_THEMES.includes(persistedTheme as ThemeName)
-        ? (persistedTheme as ThemeName)
-        : get().theme
+    const theme = normalizeTheme(persistedTheme, doc.theme ?? get().theme)
+    const documents = await listDocuments()
     set({
       activeDocId: doc.id,
+      draftTitle: doc.title,
       draftMarkdown: doc.markdown,
+      lastLocalSavedTitle: doc.title,
       lastLocalSavedMarkdown: doc.markdown,
-      theme: resolvedTheme,
+      theme,
+      documents,
+      saveStatus: 'saved',
       isHydrated: true,
     })
   },
-  persistDraft: async () => {
-    const { activeDocId, draftMarkdown } = get()
-    if (!activeDocId) {
+  createNewDraft: () => {
+    set({
+      activeDocId: null,
+      activeShareId: null,
+      draftTitle: 'Untitled Document',
+      draftMarkdown: '# Untitled Document\n\n',
+      lastLocalSavedTitle: '',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      saveStatus: 'local-only',
+      saveError: null,
+      mobileTab: 'write',
+      desktopViewMode: 'split',
+    })
+  },
+  openDocument: async (docId) => {
+    const doc = await getDocumentById(docId)
+    if (!doc) {
       return
     }
-    await updateDocumentMarkdown(activeDocId, draftMarkdown)
-    set({ lastLocalSavedMarkdown: draftMarkdown })
+    await setActiveDocumentId(doc.id)
+    set({
+      activeDocId: doc.id,
+      activeShareId: null,
+      draftTitle: doc.title,
+      draftMarkdown: doc.markdown,
+      lastLocalSavedTitle: doc.title,
+      lastLocalSavedMarkdown: doc.markdown,
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      saveStatus: 'saved',
+      saveError: null,
+      mobileTab: 'write',
+    })
+  },
+  importMarkdownDraft: (title, markdown) => {
+    set({
+      activeDocId: null,
+      activeShareId: null,
+      draftTitle: titleFromFilename(title),
+      draftMarkdown: markdown,
+      lastLocalSavedTitle: '',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      saveStatus: 'local-only',
+      saveError: null,
+      mobileTab: 'write',
+    })
+  },
+  saveDraft: async () => {
+    const { activeDocId, draftTitle, draftMarkdown, theme } = get()
+    set({ saveStatus: 'saving', saveError: null })
+    try {
+      let doc: Document
+      if (activeDocId) {
+        await updateDocument(activeDocId, {
+          title: draftTitle.trim() || 'Untitled Document',
+          markdown: draftMarkdown,
+          theme,
+        })
+        doc = (await getDocumentById(activeDocId))!
+      } else {
+        doc = await createDocument({
+          title: draftTitle.trim() || 'Untitled Document',
+          markdown: draftMarkdown,
+          theme,
+        })
+      }
+      const documents = await listDocuments()
+      set({
+        activeDocId: doc.id,
+        documents,
+        draftTitle: doc.title,
+        lastLocalSavedTitle: doc.title,
+        lastLocalSavedMarkdown: doc.markdown,
+        saveStatus: get().activeShareId ? 'synced' : 'saved',
+      })
+      return doc
+    } catch (error) {
+      set({
+        saveStatus: 'error',
+        saveError: 'Unable to save document. Please try again.',
+      })
+      throw error
+    }
   },
 }))
+
+export function hasUnsavedChanges(): boolean {
+  const state = useAppStore.getState()
+  return state.saveStatus === 'local-only' || state.saveStatus === 'unsaved' || state.saveStatus === 'error'
+}

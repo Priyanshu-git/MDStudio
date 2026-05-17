@@ -70,6 +70,12 @@ export function App() {
       if (!button || button.disabled) {
         return null
       }
+      const supportsRipple = button.matches(
+        '.primary-button, .secondary-button, .icon-button, .toolbar-button, .bottom-action, .tab-button, .avatar-button',
+      )
+      if (!supportsRipple) {
+        return null
+      }
       return button
     }
 

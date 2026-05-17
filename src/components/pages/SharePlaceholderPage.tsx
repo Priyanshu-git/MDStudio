@@ -1,27 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { User } from 'firebase/auth'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AppShellLayout } from '../layout/AppShellLayout'
+import { Copy, Edit3, LogIn, Share2 } from 'lucide-react'
 import { MarkdownPreview } from '../../preview/MarkdownPreview'
 import { getSharedDocumentById } from '../../storage/shareDocuments'
 import { createDocument } from '../../storage/documents'
 import type { SharedDocument } from '../../types'
 import { useAppStore } from '../../state/useAppStore'
+import { listenToAuthState, signInWithGoogle } from '../../firebase/auth'
 
 export function SharePlaceholderPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const theme = useAppStore((state) => state.theme)
   const setTheme = useAppStore((state) => state.setTheme)
-  const linkActiveShare = useAppStore((state) => state.linkActiveShare)
-  const setLastLocalSavedMarkdown = useAppStore((state) => state.setLastLocalSavedMarkdown)
   const setActiveDocId = useAppStore((state) => state.setActiveDocId)
+  const setDraftTitle = useAppStore((state) => state.setDraftTitle)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
+  const linkActiveShare = useAppStore((state) => state.linkActiveShare)
+  const [user, setUser] = useState<User | null>(null)
   const [document, setDocument] = useState<SharedDocument | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreatingDraft, setIsCreatingDraft] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  const shareUrl = useMemo(() => {
+    if (!id) {
+      return ''
+    }
+    const path = `/share/${id}`
+    return typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
+  }, [id])
+
+  const isOwner = Boolean(user && document?.ownerUid && user.uid === document.ownerUid)
+
+  useEffect(() => listenToAuthState(setUser), [])
 
   useEffect(() => {
     let isCurrent = true
@@ -57,19 +72,30 @@ export function SharePlaceholderPage() {
     }
   }, [id])
 
-  async function handleEdit() {
+  async function handleMakeCopy() {
     if (!document) {
       return
     }
 
     setActionError(null)
+    if (!user) {
+      try {
+        await signInWithGoogle()
+      } catch {
+        setActionError('Sign in with Google to make an editable copy.')
+        return
+      }
+    }
+
     setIsCreatingDraft(true)
     try {
-      const localDoc = await createDocument(document.markdown)
+      const localDoc = await createDocument({
+        title: `Copy of ${document.title}`,
+        markdown: document.markdown,
+      })
       setActiveDocId(localDoc.id)
-      setDraftMarkdown(document.markdown)
-      linkActiveShare(document.id, document.markdown)
-      setLastLocalSavedMarkdown(document.markdown)
+      setDraftTitle(localDoc.title)
+      setDraftMarkdown(localDoc.markdown)
       navigate('/editor')
     } catch {
       setActionError('Unable to create an editable copy right now.')
@@ -78,15 +104,24 @@ export function SharePlaceholderPage() {
     }
   }
 
+  function handleEditOriginal() {
+    if (!document || !id || !isOwner) {
+      return
+    }
+    setActiveDocId(document.sourceDocId ?? null)
+    setDraftTitle(document.title)
+    setDraftMarkdown(document.markdown)
+    linkActiveShare(id, document.title, document.markdown)
+    navigate('/editor')
+  }
+
   async function handleCopyShareUrl() {
-    if (!id || !navigator.clipboard) {
+    if (!navigator.clipboard) {
       setCopyState('failed')
       return
     }
-    const path = `/share/${id}`
-    const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(shareUrl)
       setCopyState('copied')
     } catch {
       setCopyState('failed')
@@ -94,64 +129,51 @@ export function SharePlaceholderPage() {
   }
 
   return (
-    <AppShellLayout
-      title="Shared Document"
-      actions={
-        document ? (
-          <div className="topbar-actions">
-            <label className="theme-select-label">
-              Theme
-              <select value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
-                <option value="github-light">GitHub Light</option>
-                <option value="dracula">Dracula</option>
-                <option value="lavender-fields">Lavender Fields</option>
-                <option value="blue-eclipse">Blue Eclipse</option>
-                <option value="lush-forest">Lush Forest</option>
-                <option value="ink-wash">Ink Wash</option>
-                <option value="cherry-blossom">Cherry Blossom</option>
-              </select>
-            </label>
+    <main className="shared-shell">
+      <header className="shared-topbar">
+        <strong>{document?.title ?? 'Shared Document'}</strong>
+        <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
+          <option value="github-light">GitHub Light</option>
+          <option value="github-dark">GitHub Dark</option>
+          <option value="dracula">Dracula</option>
+        </select>
+      </header>
+
+      {isLoading ? <section className="shared-state">Loading shared document...</section> : null}
+      {!isLoading && error ? <section className="shared-state">{error}</section> : null}
+      {!isLoading && !error && !document ? <section className="shared-state">Shared document not found.</section> : null}
+
+      {!isLoading && !error && document ? (
+        <>
+          <section className="shared-notice">
+            <Share2 size={18} />
+            <span>This is a shared document. You can view it or make your own editable copy.</span>
+          </section>
+          <section className="shared-preview">
+            {actionError ? <p className="error-text">{actionError}</p> : null}
+            <MarkdownPreview markdown={document.markdown} theme={theme} />
+          </section>
+          <footer className="shared-actions">
             <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
+              <Copy size={16} />
               Copy Link
             </button>
-            <button type="button" className="primary-button" onClick={() => void handleEdit()} disabled={isCreatingDraft}>
-              {isCreatingDraft ? 'Opening Editor...' : 'Edit'}
-            </button>
-          </div>
-        ) : undefined
-      }
-    >
-      {copyState === 'copied' ? (
-        <section className="publish-banner" role="status">
-          Link copied
-        </section>
+            {isOwner ? (
+              <button type="button" className="primary-button" onClick={handleEditOriginal}>
+                <Edit3 size={16} />
+                Edit Original
+              </button>
+            ) : (
+              <button type="button" className="primary-button" onClick={() => void handleMakeCopy()} disabled={isCreatingDraft}>
+                {user ? <Copy size={16} /> : <LogIn size={16} />}
+                {isCreatingDraft ? 'Making Copy...' : 'Make a Copy'}
+              </button>
+            )}
+          </footer>
+          {copyState === 'copied' ? <div className="studio-banner">Link copied</div> : null}
+          {copyState === 'failed' ? <div className="studio-banner error">Copy failed</div> : null}
+        </>
       ) : null}
-      {copyState === 'failed' ? (
-        <section className="publish-banner publish-banner-error" role="status">
-          Copy failed
-        </section>
-      ) : null}
-      {isLoading ? (
-        <section className="panel">
-          <div className="placeholder-surface">Loading shared document...</div>
-        </section>
-      ) : null}
-      {!isLoading && error ? (
-        <section className="panel">
-          <div className="placeholder-surface">{error}</div>
-        </section>
-      ) : null}
-      {!isLoading && !error && !document ? (
-        <section className="panel">
-          <div className="placeholder-surface">Shared document not found.</div>
-        </section>
-      ) : null}
-      {!isLoading && !error && document ? (
-        <section className="docs-mode-panel">
-          {actionError ? <p>{actionError}</p> : null}
-          <MarkdownPreview markdown={document.markdown} theme={theme} />
-        </section>
-      ) : null}
-    </AppShellLayout>
+    </main>
   )
 }
