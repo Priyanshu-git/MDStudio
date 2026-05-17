@@ -4,8 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Copy, Edit3, LogIn, Share2 } from 'lucide-react'
 import { MarkdownPreview } from '../../preview/MarkdownPreview'
 import { getSharedDocumentById } from '../../storage/shareDocuments'
-import { createDocument } from '../../storage/documents'
-import type { SharedDocument } from '../../types'
+import { createDocument, getDocumentById, updateDocument } from '../../storage/documents'
+import type { Document, SharedDocument } from '../../types'
 import { useAppStore } from '../../state/useAppStore'
 import { listenToAuthState, signInWithGoogle } from '../../firebase/auth'
 
@@ -23,6 +23,7 @@ export function SharePlaceholderPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreatingDraft, setIsCreatingDraft] = useState(false)
+  const [isOpeningOriginal, setIsOpeningOriginal] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
@@ -104,15 +105,45 @@ export function SharePlaceholderPage() {
     }
   }
 
-  function handleEditOriginal() {
+  async function handleEditOriginal() {
     if (!document || !id || !isOwner) {
       return
     }
-    setActiveDocId(document.sourceDocId ?? null)
-    setDraftTitle(document.title)
-    setDraftMarkdown(document.markdown)
-    linkActiveShare(id, document.title, document.markdown)
-    navigate('/editor')
+
+    setActionError(null)
+    setIsOpeningOriginal(true)
+    try {
+      const existingLocalDoc = document.sourceDocId ? await getDocumentById(document.sourceDocId) : undefined
+      let localDoc: Document
+      if (existingLocalDoc) {
+        await updateDocument(existingLocalDoc.id, {
+          title: document.title,
+          markdown: document.markdown,
+          source: 'firebase',
+          sourceShareId: id,
+          sourceOwnerUid: document.ownerUid,
+        })
+        localDoc = (await getDocumentById(existingLocalDoc.id))!
+      } else {
+        localDoc = await createDocument({
+          title: document.title,
+          markdown: document.markdown,
+          source: 'firebase',
+          sourceShareId: id,
+          sourceOwnerUid: document.ownerUid,
+        })
+      }
+
+      setActiveDocId(localDoc.id)
+      setDraftTitle(localDoc.title)
+      setDraftMarkdown(localDoc.markdown)
+      linkActiveShare(id, localDoc.title, localDoc.markdown)
+      navigate('/editor')
+    } catch {
+      setActionError('Unable to open the original document right now.')
+    } finally {
+      setIsOpeningOriginal(false)
+    }
   }
 
   async function handleCopyShareUrl() {
@@ -159,9 +190,9 @@ export function SharePlaceholderPage() {
               Copy Link
             </button>
             {isOwner ? (
-              <button type="button" className="primary-button" onClick={handleEditOriginal}>
+              <button type="button" className="primary-button" onClick={() => void handleEditOriginal()} disabled={isOpeningOriginal}>
                 <Edit3 size={16} />
-                Edit Original
+                {isOpeningOriginal ? 'Opening...' : 'Edit Original'}
               </button>
             ) : (
               <button type="button" className="primary-button" onClick={() => void handleMakeCopy()} disabled={isCreatingDraft}>

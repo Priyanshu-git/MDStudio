@@ -78,9 +78,20 @@ describe('Sharing flow', () => {
         owner: expect.objectContaining({ uid: 'user-1' }),
       }),
     )
+    await waitFor(() => {
+      expect(useAppStore.getState().documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: 'firebase',
+            sourceShareId: 'share-1',
+            sourceOwnerUid: 'user-1',
+          }),
+        ]),
+      )
+    })
   })
 
-  it('shows update action for an existing shared link in the editor', async () => {
+  it('does not show update action for an existing shared link in the editor', async () => {
     window.history.pushState({}, '', '/editor')
 
     render(
@@ -102,7 +113,9 @@ describe('Sharing flow', () => {
     })
 
     fireEvent.click(screen.getAllByRole('button', { name: /Share/ })[0])
-    expect(await screen.findByRole('button', { name: 'Update Link' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Read-only share link')).toHaveValue('http://localhost:3000/share/share-xyz')
+    expect(screen.queryByRole('button', { name: 'Update Link' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create Link' })).not.toBeInTheDocument()
   })
 
   it('renders shared document from firestore route with make-copy action for non-owners', async () => {
@@ -128,6 +141,71 @@ describe('Sharing flow', () => {
     })
     expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Original' })).not.toBeInTheDocument()
+  })
+
+  it('keeps non-owner shared document copies as local documents', async () => {
+    authMock.user = { uid: 'viewer', displayName: 'Viewer', email: 'viewer@example.com' }
+    window.history.pushState({}, '', '/share/share-copy')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'share-copy',
+      title: 'Shared Copy Source',
+      markdown: '# Shared Copy Source',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Make a Copy' }))
+
+    await waitFor(async () => {
+      const documents = await db.documents.toArray()
+      expect(documents[0]).toEqual(
+        expect.objectContaining({
+          title: 'Copy of Shared Copy Source',
+          source: 'local',
+        }),
+      )
+    })
+  })
+
+  it('persists owner-opened shared documents as firebase sourced recent documents', async () => {
+    window.history.pushState({}, '', '/share/share-owned')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'share-owned',
+      title: 'Owner Cloud Title',
+      markdown: '# Owner Cloud Title',
+      ownerUid: 'user-1',
+      createdAt: 1,
+      updatedAt: 2,
+      sourceDocId: 'missing-local-source',
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Original' }))
+
+    await waitFor(async () => {
+      const documents = await db.documents.toArray()
+      expect(documents).toHaveLength(1)
+      expect(documents[0]).toEqual(
+        expect.objectContaining({
+          title: 'Owner Cloud Title',
+          source: 'firebase',
+          sourceShareId: 'share-owned',
+          sourceOwnerUid: 'user-1',
+        }),
+      )
+    })
   })
 
   it('shows not found state for missing shared document', async () => {

@@ -3,12 +3,17 @@ export type ThemeName =
   | 'github-dark'
   | 'dracula'
 
+export type DocumentSource = 'local' | 'firebase'
+
 export type Document = {
   id: string
   title: string
   markdown: string
   createdAt: number
   updatedAt: number
+  source: DocumentSource
+  sourceShareId?: string
+  sourceOwnerUid?: string
   theme?: ThemeName
 }
 

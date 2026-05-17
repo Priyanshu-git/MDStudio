@@ -1,5 +1,5 @@
 import { db } from './db'
-import type { Document, ThemeName } from '../types'
+import type { Document, DocumentSource, ThemeName } from '../types'
 
 const ACTIVE_DOC_KEY = 'activeDocId'
 const THEME_KEY = 'theme'
@@ -8,12 +8,18 @@ export type CreateDocumentInput = {
   title?: string
   markdown: string
   theme?: ThemeName
+  source?: DocumentSource
+  sourceShareId?: string
+  sourceOwnerUid?: string
 }
 
 export type UpdateDocumentInput = {
   title?: string
   markdown?: string
   theme?: ThemeName
+  source?: DocumentSource
+  sourceShareId?: string
+  sourceOwnerUid?: string
 }
 
 const DEFAULT_TITLE = 'Untitled Document'
@@ -24,9 +30,14 @@ function titleFromMarkdown(markdown: string): string {
 }
 
 function normalizeDocument(doc: Document): Document {
+  const { sourceShareId, sourceOwnerUid, ...rest } = doc
+  const source = doc.source === 'firebase' ? 'firebase' : 'local'
   return {
-    ...doc,
+    ...rest,
     title: doc.title || titleFromMarkdown(doc.markdown),
+    source,
+    ...(source === 'firebase' && sourceShareId ? { sourceShareId } : {}),
+    ...(source === 'firebase' && sourceOwnerUid ? { sourceOwnerUid } : {}),
   }
 }
 
@@ -39,6 +50,9 @@ export async function createDocument(input: CreateDocumentInput | string): Promi
     markdown: payload.markdown,
     createdAt: now,
     updatedAt: now,
+    source: payload.source ?? 'local',
+    ...(payload.sourceShareId ? { sourceShareId: payload.sourceShareId } : {}),
+    ...(payload.sourceOwnerUid ? { sourceOwnerUid: payload.sourceOwnerUid } : {}),
     ...(payload.theme ? { theme: payload.theme } : {}),
   }
   await db.documents.put(doc)

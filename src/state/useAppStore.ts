@@ -254,7 +254,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
   saveDraft: async () => {
-    const { activeDocId, draftTitle, draftMarkdown, theme } = get()
+    const { activeDocId, activeShareId, draftTitle, draftMarkdown, theme } = get()
     set({ saveStatus: 'saving', saveError: null })
     try {
       let doc: Document
@@ -263,6 +263,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           title: draftTitle.trim() || 'Untitled Document',
           markdown: draftMarkdown,
           theme,
+          ...(activeShareId ? { source: 'firebase' as const, sourceShareId: activeShareId } : {}),
         })
         doc = (await getDocumentById(activeDocId))!
       } else {
@@ -270,6 +271,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           title: draftTitle.trim() || 'Untitled Document',
           markdown: draftMarkdown,
           theme,
+          ...(activeShareId ? { source: 'firebase' as const, sourceShareId: activeShareId } : {}),
         })
       }
       const documents = await listDocuments()

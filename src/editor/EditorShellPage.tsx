@@ -11,8 +11,10 @@ import {
   Eye,
   FileText,
   GitBranch,
+  Cloud,
   Heading1,
   Heading2,
+  HardDrive,
   Image,
   Italic,
   Link,
@@ -36,6 +38,7 @@ import {
 } from 'lucide-react'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
+import { updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -122,6 +125,31 @@ function downloadFile(filename: string, mimeType: string, content: string) {
   anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+function formatRelativeTime(timestamp: number, now = Date.now()): string {
+  const diffMs = Math.max(0, now - timestamp)
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  const month = 30 * day
+  const year = 365 * day
+
+  if (diffMs < minute) {
+    return 'just now'
+  }
+
+  const units = [
+    { label: 'year', value: year },
+    { label: 'month', value: month },
+    { label: 'day', value: day },
+    { label: 'hour', value: hour },
+    { label: 'min', value: minute },
+  ]
+  const unit = units.find((item) => diffMs >= item.value) ?? units[units.length - 1]
+  const count = Math.floor(diffMs / unit.value)
+  const suffix = count === 1 ? unit.label : `${unit.label}s`
+  return `${count} ${suffix} ago`
 }
 
 function escapeHtml(text: string): string {
@@ -394,6 +422,12 @@ export function EditorShellPage() {
           markdown: draftMarkdown,
           sourceDocId: doc.id,
         })
+        await updateDocument(doc.id, {
+          source: 'firebase',
+          sourceShareId: activeShareId,
+          sourceOwnerUid: user.uid,
+        })
+        await refreshDocuments()
         setLastCloudSavedSnapshot(draftTitle, draftMarkdown)
       } else {
         const result = await publishSharedDocument({
@@ -402,6 +436,12 @@ export function EditorShellPage() {
           sourceDocId: doc.id,
           owner: getOwnerProfile(user),
         })
+        await updateDocument(doc.id, {
+          source: 'firebase',
+          sourceShareId: result.shareId,
+          sourceOwnerUid: user.uid,
+        })
+        await refreshDocuments()
         linkActiveShare(result.shareId, draftTitle, draftMarkdown)
       }
     } catch {
@@ -530,8 +570,9 @@ export function EditorShellPage() {
           ))}
         </nav>
         <div className="topbar-spacer" />
-        <button type="button" className="icon-button" aria-label="Search">
-          <Search size={18} />
+        <button type="button" className="primary-button" onClick={() => void handleSave()} disabled={saveStatus === 'saving'}>
+          <Save size={16} />
+          Save
         </button>
         <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
           <option value="github-light">GitHub Light</option>
@@ -756,23 +797,21 @@ export function EditorShellPage() {
             ) : null}
             {copyState === 'copied' ? <p className="success-text">Link copied</p> : null}
             {copyState === 'failed' ? <p className="error-text">Copy failed</p> : null}
-            <div className="dialog-actions">
-              {!user ? (
-                <button type="button" className="secondary-button" onClick={() => void handleSignIn()}>
-                  <LogIn size={16} />
-                  Sign in with Google
-                </button>
-              ) : (
-                <button type="button" className="secondary-button" onClick={() => void handleSignOut()}>
-                  <LogOut size={16} />
-                  Sign out
-                </button>
-              )}
-              <button type="button" className="primary-button" onClick={() => void handleSharePublish()} disabled={isSharing}>
-                <Share2 size={16} />
-                {isSharing ? 'Sharing...' : activeShareId ? 'Update Link' : 'Create Link'}
-              </button>
-            </div>
+            {!user || !activeShareId ? (
+              <div className="dialog-actions">
+                {!user ? (
+                  <button type="button" className="secondary-button" onClick={() => void handleSignIn()}>
+                    <LogIn size={16} />
+                    Sign in with Google
+                  </button>
+                ) : (
+                  <button type="button" className="primary-button" onClick={() => void handleSharePublish()} disabled={isSharing}>
+                    <Share2 size={16} />
+                    {isSharing ? 'Sharing...' : 'Create Link'}
+                  </button>
+                )}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -943,7 +982,7 @@ function EditorToolbar({
   )
 }
 
-function DocumentList({
+export function DocumentList({
   documents,
   activeDocId,
   onOpen,
@@ -956,18 +995,26 @@ function DocumentList({
     <section className="sidebar-section">
       <h2>Recent Documents</h2>
       <div className="document-list">
-        {documents.slice(0, 6).map((doc) => (
-          <button
-            key={doc.id}
-            type="button"
-            className={doc.id === activeDocId ? 'document-row active' : 'document-row'}
-            onClick={() => onOpen(doc.id)}
-          >
-            <FileText size={17} />
-            <span>{doc.title}</span>
-            <small>{new Date(doc.updatedAt).toLocaleDateString()}</small>
-          </button>
-        ))}
+        {documents.slice(0, 6).map((doc) => {
+          const SourceIcon = doc.source === 'firebase' ? Cloud : HardDrive
+          const sourceLabel = doc.source === 'firebase' ? 'Firebase document' : 'Local document'
+          return (
+            <button
+              key={doc.id}
+              type="button"
+              className={doc.id === activeDocId ? 'document-row active' : 'document-row'}
+              onClick={() => onOpen(doc.id)}
+            >
+              <span className="document-source-icon" role="img" aria-label={sourceLabel} title={sourceLabel}>
+                <SourceIcon size={17} aria-hidden="true" />
+              </span>
+              <span className="document-row-copy">
+                <span className="document-title">{doc.title}</span>
+                <small>{formatRelativeTime(doc.updatedAt)}</small>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </section>
   )
@@ -1006,7 +1053,7 @@ function Outline({
   )
 }
 
-function FilesView({
+export function FilesView({
   documents,
   activeDocId,
   search,
@@ -1042,19 +1089,29 @@ function FilesView({
           <h2>Recent Documents</h2>
           <button type="button">View all</button>
         </div>
-        {documents.map((doc) => (
-          <button
-            key={doc.id}
-            type="button"
-            className={doc.id === activeDocId ? 'mobile-document-row active' : 'mobile-document-row'}
-            onClick={() => onOpen(doc.id)}
-          >
-            <FileText size={28} />
-            <span>{doc.title}</span>
-            <small>{new Date(doc.updatedAt).toLocaleDateString()} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB</small>
-            <MoreVertical size={18} />
-          </button>
-        ))}
+        {documents.map((doc) => {
+          const SourceIcon = doc.source === 'firebase' ? Cloud : HardDrive
+          const sourceLabel = doc.source === 'firebase' ? 'Firebase document' : 'Local document'
+          return (
+            <button
+              key={doc.id}
+              type="button"
+              className={doc.id === activeDocId ? 'mobile-document-row active' : 'mobile-document-row'}
+              onClick={() => onOpen(doc.id)}
+            >
+              <span className="document-source-icon mobile" role="img" aria-label={sourceLabel} title={sourceLabel}>
+                <SourceIcon size={26} aria-hidden="true" />
+              </span>
+              <span className="document-row-copy">
+                <span className="document-title">{doc.title}</span>
+                <small>
+                  {formatRelativeTime(doc.updatedAt)} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB
+                </small>
+              </span>
+              <MoreVertical className="document-more-icon" size={18} />
+            </button>
+          )
+        })}
       </section>
       <div className="info-callout">
         <strong>Import supports .md files only.</strong>

@@ -47,6 +47,23 @@ describe('App Store (Zustand)', () => {
     expect(doc?.markdown).toBe('# New Content')
   })
 
+  it('keeps shared documents marked as firebase backed after local save', async () => {
+    await useAppStore.getState().hydrateDocument()
+    const docId = useAppStore.getState().activeDocId!
+
+    useAppStore.getState().linkActiveShare('share-1', useAppStore.getState().draftTitle, useAppStore.getState().draftMarkdown)
+    useAppStore.getState().setDraftMarkdown('# Locally Edited Shared Doc')
+    await useAppStore.getState().saveDraft()
+
+    const doc = await db.documents.get(docId)
+    expect(doc).toEqual(
+      expect.objectContaining({
+        source: 'firebase',
+        sourceShareId: 'share-1',
+      }),
+    )
+  })
+
   it('updates and persists theme', async () => {
     useAppStore.getState().setTheme('dracula')
     expect(useAppStore.getState().theme).toBe('dracula')

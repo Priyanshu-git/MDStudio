@@ -31,6 +31,23 @@ describe('User Journeys', () => {
   beforeEach(async () => {
     await db.documents.clear()
     await db.appState.clear()
+    useAppStore.setState({
+      activeDocId: null,
+      activeShareId: null,
+      documents: [],
+      draftTitle: 'Markdown Rendering Test File',
+      draftMarkdown: '# Markdown Rendering Test File',
+      lastLocalSavedTitle: '',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      isHydrated: false,
+      theme: 'github-light',
+      mobileTab: 'write',
+      desktopViewMode: 'split',
+      saveStatus: 'local-only',
+      saveError: null,
+    })
     // Reset window location
     window.history.pushState({}, '', '/editor')
   })
@@ -71,6 +88,20 @@ describe('User Journeys', () => {
 
     // 7. Simulate reload by unmounting and remounting
     unmount()
+    useAppStore.setState({
+      activeDocId: null,
+      activeShareId: null,
+      documents: [],
+      draftTitle: 'Markdown Rendering Test File',
+      draftMarkdown: '# Markdown Rendering Test File',
+      lastLocalSavedTitle: '',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      isHydrated: false,
+      saveStatus: 'local-only',
+      saveError: null,
+    })
     
     render(
       <BrowserRouter>

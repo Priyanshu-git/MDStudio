@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { DocumentList, FilesView } from './editor/EditorShellPage'
 import { listenToAuthState, signOutCurrentUser } from './firebase/auth'
 import { useAppStore } from './state/useAppStore'
 import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './storage/shareDocuments'
@@ -119,6 +120,83 @@ describe('App routing shell', () => {
     expect(outlineTab).toHaveClass('active')
     expect(screen.queryByRole('heading', { name: 'Recent Documents' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Core markdown features/ })).toBeInTheDocument()
+  })
+
+  it('shows recent document source icons and relative time on desktop', async () => {
+    const now = new Date('2026-05-17T10:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
+    const documents = [
+      {
+        id: 'firebase-doc',
+        title: 'Cloud Notes',
+        markdown: '# Cloud Notes',
+        createdAt: now - 2 * 24 * 60 * 60 * 1000,
+        updatedAt: now - 2 * 24 * 60 * 60 * 1000,
+        source: 'firebase',
+        sourceShareId: 'share-1',
+        sourceOwnerUid: 'user-1',
+      },
+      {
+        id: 'local-doc',
+        title: 'Local Notes',
+        markdown: '# Local Notes',
+        createdAt: now - 5 * 60 * 1000,
+        updatedAt: now - 5 * 60 * 1000,
+        source: 'local',
+      },
+    ] as ReturnType<typeof useAppStore.getState>['documents']
+
+    render(
+      <DocumentList
+        documents={documents}
+        activeDocId="local-doc"
+        onOpen={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Local Notes')).toBeInTheDocument()
+    expect(screen.getByText('5 mins ago')).toBeInTheDocument()
+    expect(screen.getByText('2 days ago')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Local document').length).toBeGreaterThan(0)
+    expect(screen.getAllByLabelText('Firebase document').length).toBeGreaterThan(0)
+    expect(screen.queryByText(new Date(now - 5 * 60 * 1000).toLocaleDateString())).not.toBeInTheDocument()
+
+    nowSpy.mockRestore()
+  })
+
+  it('shows recent document source icons and relative time on mobile files view', () => {
+    const now = new Date('2026-05-17T10:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
+    const documents = [
+      {
+        id: 'firebase-doc',
+        title: 'Cloud Notes',
+        markdown: '# Cloud Notes',
+        createdAt: now - 2 * 24 * 60 * 60 * 1000,
+        updatedAt: now - 2 * 24 * 60 * 60 * 1000,
+        source: 'firebase',
+        sourceShareId: 'share-1',
+        sourceOwnerUid: 'user-1',
+      },
+    ] as ReturnType<typeof useAppStore.getState>['documents']
+
+    render(
+      <FilesView
+        documents={documents}
+        activeDocId="firebase-doc"
+        search=""
+        onSearch={vi.fn()}
+        onNew={vi.fn()}
+        onImport={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Cloud Notes')).toBeInTheDocument()
+    expect(screen.getByText('2 days ago · 1 KB')).toBeInTheDocument()
+    expect(screen.getByLabelText('Firebase document')).toBeInTheDocument()
+
+    nowSpy.mockRestore()
   })
 
   it('scrolls editor and preview when selecting an outline item from preview mode', async () => {
