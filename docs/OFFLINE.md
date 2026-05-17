@@ -6,6 +6,7 @@ Markdown Studio is designed to be fully functional offline.
 
 - **PWA (Progressive Web App):** The application uses a service worker to cache all necessary assets (HTML, JS, CSS, fonts, and renderers) for offline use.
 - **Local Persistence:** All documents and application settings are stored in **IndexedDB** using Dexie.js. This data never leaves your browser and is available even without an internet connection.
+- **Build config:** `vite-plugin-pwa` is enabled by default and can be disabled with `DISABLE_PWA=true`.
 
 ## Offline Features
 
@@ -27,6 +28,10 @@ Markdown Studio is designed to be fully functional offline.
 - **Remote Images:** Markdown images pointing to external URLs will not be available offline unless they have been previously cached by your browser's standard cache.
 - **Initial Installation:** You must visit the application once while online to allow the service worker to install and cache the assets.
 - **Updates:** Application updates will be downloaded in the background when you are online and applied automatically on the next reload.
+
+## Local Build Notes
+
+Vite config redirects `TMPDIR`, `TMP`, and `TEMP` to `node_modules/.vite-temp` before plugin setup. This keeps build and test temp output inside the workspace dependency tree.
 
 ## Installation
 

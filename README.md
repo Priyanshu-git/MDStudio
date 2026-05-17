@@ -29,10 +29,10 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 - Desktop edit, split, and preview modes.
 - Mobile write, preview, outline, and files tabs.
 - Markdown preview with GFM, math, Mermaid, and syntax-highlighted code blocks.
-- Theme persistence for `github-light`, `github-dark`, and `dracula`.
+- Theme persistence for `github-light`, `github-dark`, `pastel-mint`, `minimal-ivory`, `one-dark`, and `blue-eclipse`.
 - `.md` import plus Markdown, HTML, and browser print/PDF export.
 - Google sign-in for sharing, an account menu, and inline sign-out confirmation.
-- Public `/share/:id` read-only pages with owner-only `Edit Original` and non-owner `Make a Copy`.
+- Public `/share/:id` read-only pages with owner-only `Edit Original`, non-owner `Make a Copy`, and local source tracking for Firebase-backed documents.
 
 ## Offline & PWA
 

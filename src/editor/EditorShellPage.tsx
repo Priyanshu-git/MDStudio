@@ -43,7 +43,7 @@ import { updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
-import type { DesktopViewMode, MobileTab, SaveStatus } from '../types'
+import type { DesktopViewMode, MobileTab, SaveStatus, ThemeName } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
 
 type OutlineItem = {
@@ -60,6 +60,16 @@ type ToolbarItem = {
 }
 
 type DesktopSidebarTab = 'documents' | 'outline'
+
+type ThemeOption = {
+  value: ThemeName
+  label: string
+}
+
+type ThemeGroup = {
+  label: string
+  options: ThemeOption[]
+}
 
 const toolbarItems: ToolbarItem[] = [
   { action: 'bold', label: 'Bold', icon: Bold },
@@ -86,7 +96,7 @@ const mobileTabs: Array<{ id: MobileTab; label: string }> = [
   { id: 'files', label: 'Files' },
 ]
 
-const themeGroups = [
+const themeGroups: ThemeGroup[] = [
   {
     label: 'Light',
     options: [
@@ -654,7 +664,7 @@ export function EditorShellPage() {
                       aria-checked={option.value === theme}
                       className={option.value === theme ? 'theme-menu-option active' : 'theme-menu-option'}
                       onClick={() => {
-                        setTheme(option.value as typeof theme)
+                        setTheme(option.value)
                         setIsThemeMenuOpen(false)
                       }}
                     >

@@ -9,8 +9,9 @@ This document describes the current product behavior that should remain stable a
 3. Editing the title or markdown updates draft state and marks the document dirty.
 4. `Save` writes the current title, markdown, and theme to IndexedDB.
 5. Recent documents are listed from IndexedDB by `updatedAt` descending.
-6. Opening a different document clears any active share link and loads that local document into the editor.
-7. If there are unsaved changes, navigating away from the current document asks for confirmation.
+6. Recent document rows show local/Firebase source icons and relative updated times.
+7. Opening a different document clears any active share link and loads that local document into the editor.
+8. If there are unsaved changes, navigating away from the current document asks for confirmation.
 
 ## Desktop Authoring
 
@@ -56,9 +57,10 @@ Sharing requires Google sign-in.
 1. The user opens the Share dialog.
 2. If signed out, publishing shows a sign-in requirement.
 3. When signed in, creating a link first saves the local draft, then creates a Firestore `sharedDocuments` record with title, markdown, owner metadata, timestamps, and source document ID.
-4. The returned share ID is stored in app state as the active share link.
-5. Updating an active share link saves locally, updates the existing Firestore record, and refreshes the cloud snapshot.
-6. Copy Link writes the active share URL to the clipboard when available.
+4. The local document is then marked as Firebase-backed with the returned share ID and owner UID.
+5. The returned share ID is stored in app state as the active share link.
+6. Once a link exists, the share dialog shows the read-only link and copy action, but does not show a create or update action.
+7. Copy Link writes the active share URL to the clipboard when available.
 
 Firestore is a published copy. The local IndexedDB document remains the canonical editable source.
 
@@ -68,7 +70,7 @@ Firestore is a published copy. The local IndexedDB document remains the canonica
 
 Shared pages show loading, not-found, and load-error states. The viewer can copy the share URL.
 
-If the signed-in viewer owns the shared document, they see `Edit Original`. This loads the shared title and markdown into `/editor`, links the active share ID, and lets the next share action update the same link.
+If the signed-in viewer owns the shared document, they see `Edit Original`. This reuses the shared `sourceDocId` when that local document exists, or creates a Firebase-sourced local document when it does not. It then loads the shared title and markdown into `/editor` and links the active share ID.
 
 If the viewer is not the owner, they see `Make a Copy`. Signed-out users are prompted to sign in first. A copy creates a new local IndexedDB document titled `Copy of <shared title>` and opens it in `/editor`.
 
@@ -77,6 +79,8 @@ If the viewer is not the owner, they see `Make a Copy`. Signed-out users are pro
 The supported themes are `github-light`, `github-dark`, `pastel-mint`, `minimal-ivory`, `one-dark`, and `blue-eclipse`.
 
 Theme preference is stored locally. Shared documents do not persist theme, so `/share/:id` renders with the viewer's current local theme preference.
+
+The editor uses a grouped theme menu with Light and Dark sections. Shared pages use a native theme select with disabled group labels.
 
 ## Offline Expectations
 

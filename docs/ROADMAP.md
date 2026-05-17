@@ -25,13 +25,16 @@ PWA and offline hardening.
 Quality, performance, and release hardening.
 
 ## Phase 8 (Completed)
-Authenticated sharing: Google sign-in, Firestore `sharedDocuments`, public `/share/:id`, owner edit-original flow, and non-owner make-copy flow.
+Authenticated sharing: Google sign-in, Firestore `sharedDocuments`, public `/share/:id`, local Firebase source metadata, owner edit-original flow, and non-owner make-copy flow.
 
 ## Phase 9 (Completed)
 Account menu polish: desktop/mobile avatar access, identity display, inline sign-out confirmation, Escape/outside-click reset, and regression coverage.
 
 ## Phase 10 (Completed)
 User-flow documentation covering local editing, desktop/mobile authoring, import/export, account access, sharing, shared-link viewing, theming, and offline expectations.
+
+## Phase 11 (Completed)
+Grouped theme selection and local/Firebase document source indicators for recent documents.
 
 ## Future Extension Points
 - Stronger Firestore schema/rate-limit hardening.

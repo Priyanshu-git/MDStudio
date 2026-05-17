@@ -23,10 +23,12 @@ Google sign-in uses Firebase Auth with `signInWithPopup` and `prompt: select_acc
 - `/editor` continues to save editable documents locally in IndexedDB.
 - Unauthenticated users can edit locally but must sign in with Google to share.
 - Creating a share link writes a Firestore document in `sharedDocuments`.
-- Updating an existing share link updates that Firestore document.
+- After link creation, the local document is marked as Firebase-backed with `sourceShareId` and `sourceOwnerUid`.
+- The current share dialog shows the existing link and copy action for already-linked documents; it does not expose an update-link action.
 - `/share/:id` loads title, markdown, and owner metadata from Firestore in read-only mode.
 - Shared pages are public by ID.
 - Owners see `Edit Original`; non-owners see `Make a Copy`.
+- `Edit Original` reuses the shared document's `sourceDocId` when it exists locally, otherwise creates a Firebase-sourced local document.
 - Theme is not stored in Firestore; shared pages use the app-level local theme preference.
 
 ## Firestore Document Shape

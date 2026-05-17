@@ -6,6 +6,7 @@
 - Route-driven app shell with local-first editor state and Firestore-backed sharing.
 - Firebase Auth is used for Google sign-in and share ownership.
 - IndexedDB remains the canonical local document store.
+- Vite owns build/test configuration, including PWA setup and workspace-local temp output.
 
 ## Route Contract
 - `/` redirects to `/editor`
@@ -26,7 +27,7 @@
 - `src/editor`: editor shell, CodeMirror integration, toolbar actions, sharing dialog, account menu
 - `src/preview`: markdown preview surface
 - `src/renderers`: code and mermaid block renderers
-- `src/storage`: Dexie local persistence and Firestore share services
+- `src/storage`: Dexie local persistence, local document source metadata, and Firestore share services
 - `src/firebase`: Firebase client and Google auth helpers
 - `src/state`: Zustand app-level state contracts
 - `src/types`: canonical shared domain types
@@ -34,13 +35,16 @@
 ## Data Flow
 CodeMirror input -> app store draft state -> explicit local save -> Dexie -> markdown pipeline -> preview renderers.
 
-Sharing flow: signed-in user -> save local draft -> create or update Firestore `sharedDocuments` record -> store active share snapshot in app state -> `/share/:id` reads public record.
+Sharing flow: signed-in user -> save local draft -> create Firestore `sharedDocuments` record -> mark the local document as `source: 'firebase'` with share metadata -> store active share snapshot in app state -> `/share/:id` reads public record.
+
+Owner shared-document flow: owner opens `/share/:id` -> reuse `sourceDocId` when present locally, or create a Firebase-sourced local document -> link active share state -> navigate to `/editor`.
 
 For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, persistence, auth, sharing, import/export, and offline changes.
 
 ## UI Mode State
 - `desktopViewMode: 'edit' | 'split' | 'preview'` is owned by app state.
 - `mobileTab: 'write' | 'preview' | 'outline' | 'files'` is owned by app state.
+- The desktop editor theme picker is a custom grouped menu with light and dark theme sections; Escape and outside pointer down close it.
 
 ## Account Menu
 - Auth state is observed through `listenToAuthState`.
