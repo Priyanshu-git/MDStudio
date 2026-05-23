@@ -1444,9 +1444,15 @@ select:focus-visible {
     background: var(--surface);
   }
 
-  .mobile-panel-surface .markdown-editor {
-    height: calc(100dvh - 64px - 44px - 46px - 108px);
-    min-height: 360px;
+  .mobile-panel-write {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+  }
+
+  .mobile-panel-write .markdown-editor {
+    height: auto;
+    min-height: 0;
     border-bottom: 1px solid var(--border);
   }
 
@@ -1465,6 +1471,27 @@ select:focus-visible {
 
   .mobile-preview {
     padding: 24px 18px;
+  }
+
+  .mobile-preview .markdown-doc h1 {
+    font-size: 1.82rem;
+  }
+
+  .mobile-preview .code-content {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .mobile-preview .line-number-gutter {
+    padding-inline: 6px;
+  }
+
+  .mobile-preview .code-highlight {
+    overflow-x: auto;
+  }
+
+  .mobile-preview .code-highlight pre,
+  .mobile-preview .code-highlight code {
+    min-width: max-content;
   }
 
   .mobile-bottom-bar {
@@ -1527,6 +1554,7 @@ select:focus-visible {
     justify-content: space-between;
     align-items: center;
     margin-top: 12px;
+    padding: 0 2px;
   }
 
   .section-title-row h2 {
@@ -1609,10 +1637,13 @@ select:focus-visible {
   .modal-backdrop.mobile-only {
     align-items: flex-end;
     padding: 0;
+    overflow: hidden;
   }
 
   .bottom-sheet {
     width: 100%;
+    max-height: min(92dvh, 640px);
+    overflow-y: auto;
     border-radius: 16px 16px 0 0;
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
   }
@@ -1631,6 +1662,23 @@ select:focus-visible {
 
   .shared-actions button {
     flex: 1;
+  }
+
+  .shared-topbar {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .shared-topbar strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .shared-topbar .theme-select {
+    min-width: 138px;
+    max-width: 46vw;
   }
 }
 

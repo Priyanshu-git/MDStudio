@@ -885,7 +885,7 @@ export function EditorShellPage() {
           ) : null}
         </section>
 
-        <section className="mobile-panel-surface">
+        <section className={`mobile-panel-surface mobile-panel-${mobileTab}`}>
           {isMobileViewport && mobileTab === 'write' ? (
             <>
               <EditorToolbar onInsert={handleInsert} onRedo={handleRedo} onUndo={handleUndo} compact />
@@ -1296,11 +1296,11 @@ export function FilesView({
         <Upload size={18} />
         Import .md file only
       </button>
+      <div className="section-title-row">
+        <h2>Recent Documents</h2>
+        <button type="button">View all</button>
+      </div>
       <section className="mobile-document-list">
-        <div className="section-title-row">
-          <h2>Recent Documents</h2>
-          <button type="button">View all</button>
-        </div>
         {documents.map((doc) => {
           const SourceIcon = doc.source === 'firebase' ? Cloud : HardDrive
           const sourceLabel = doc.source === 'firebase' ? 'Firebase document' : 'Local document'
