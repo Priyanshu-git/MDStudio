@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -225,9 +225,10 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(screen.getByRole('option', { name: 'LIGHT' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'DARK' })).toBeInTheDocument()
-    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'blue-eclipse' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Select theme' }))
+    expect(screen.getByText('Light')).toBeInTheDocument()
+    expect(screen.getByText('Dark')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Blue Eclipse' }))
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
   })
 
@@ -461,6 +462,117 @@ describe('App routing shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Redo' }))
     await waitFor(() => {
       expect(useAppStore.getState().draftMarkdown).toBe('****Body')
+    })
+  })
+
+  it('opens a link popup and inserts a complete link', async () => {
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Link Test',
+      draftMarkdown: 'Body',
+      lastLocalSavedTitle: 'Link Test',
+      lastLocalSavedMarkdown: 'Body',
+    })
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Link' }))
+
+    expect(screen.getByRole('dialog', { name: 'Insert link' })).toBeInTheDocument()
+    expect(useAppStore.getState().draftMarkdown).toBe('Body')
+
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Docs' } })
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://example.com' } })
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert link' })).getByRole('button', { name: 'Insert' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().draftMarkdown).toBe('[Docs](https://example.com)Body')
+    })
+  })
+
+  it('opens an image popup and inserts a complete image', async () => {
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Image Test',
+      draftMarkdown: 'Body',
+      lastLocalSavedTitle: 'Image Test',
+      lastLocalSavedMarkdown: 'Body',
+    })
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Image from URL' }))
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Logo' } })
+    fireEvent.change(screen.getByLabelText('Image URL'), { target: { value: 'https://example.com/logo.png' } })
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert image' })).getByRole('button', { name: 'Insert' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().draftMarkdown).toBe('![Logo](https://example.com/logo.png)Body')
+    })
+  })
+
+  it('cancels link popup without changing markdown', () => {
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Cancel Test',
+      draftMarkdown: 'Body',
+      lastLocalSavedTitle: 'Cancel Test',
+      lastLocalSavedMarkdown: 'Body',
+    })
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Link' }))
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Docs' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Insert link' })).not.toBeInTheDocument()
+    expect(useAppStore.getState().draftMarkdown).toBe('Body')
+  })
+
+  it('opens the image popup from the mobile insert sheet after switching to write mode', async () => {
+    mockMobileViewport(true)
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Mobile Image Test',
+      draftMarkdown: 'Body',
+      lastLocalSavedTitle: 'Mobile Image Test',
+      lastLocalSavedMarkdown: 'Body',
+      mobileTab: 'preview',
+    })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.mobile-bottom-bar .bottom-action:nth-child(3)')!)
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.insert-action[aria-label="Image from URL"]')!)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Insert image' })).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Logo' } })
+    fireEvent.change(screen.getByLabelText('Image URL'), { target: { value: 'https://example.com/logo.png' } })
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert image' })).getByRole('button', { name: 'Insert' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().mobileTab).toBe('write')
+      expect(useAppStore.getState().draftMarkdown).toBe('![Logo](https://example.com/logo.png)Body')
     })
   })
 

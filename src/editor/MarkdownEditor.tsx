@@ -12,7 +12,12 @@ import {
   keymap,
   lineNumbers,
 } from '@codemirror/view'
-import { applyMarkdownInsert, type MarkdownInsertAction } from './markdownInsert'
+import {
+  applyMarkdownInsert,
+  applyMarkdownLinkInsert,
+  type MarkdownInsertAction,
+  type MarkdownLinkInsertOptions,
+} from './markdownInsert'
 
 type MarkdownEditorProps = {
   value: string
@@ -21,10 +26,18 @@ type MarkdownEditorProps = {
 
 export type MarkdownEditorHandle = {
   applyAction: (action: MarkdownInsertAction) => void
+  applyLink: (options: MarkdownLinkInsertOptions, selection?: EditorSelectionSnapshot) => void
   focus: () => void
+  getSelectionSnapshot: () => EditorSelectionSnapshot | null
   redo: () => void
   scrollToLine: (lineNumber: number) => void
   undo: () => void
+}
+
+export type EditorSelectionSnapshot = {
+  from: number
+  to: number
+  text: string
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
@@ -109,8 +122,43 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         })
         view.focus()
       },
+      applyLink(options, selection) {
+        const view = viewRef.current
+        if (!view) {
+          return
+        }
+        const currentSelection = view.state.selection.main
+        const from = selection?.from ?? currentSelection.from
+        const to = selection?.to ?? currentSelection.to
+        const result = applyMarkdownLinkInsert(
+          view.state.doc.toString(),
+          options,
+          from,
+          to,
+        )
+        view.dispatch({
+          changes: result.changes,
+          selection: {
+            anchor: result.selectionStart,
+            head: result.selectionEnd,
+          },
+        })
+        view.focus()
+      },
       focus() {
         viewRef.current?.focus()
+      },
+      getSelectionSnapshot() {
+        const view = viewRef.current
+        if (!view) {
+          return null
+        }
+        const selection = view.state.selection.main
+        return {
+          from: selection.from,
+          to: selection.to,
+          text: view.state.doc.sliceString(selection.from, selection.to),
+        }
       },
       redo() {
         const view = viewRef.current

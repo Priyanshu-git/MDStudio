@@ -502,6 +502,15 @@ a {
   background: var(--accent-strong);
 }
 
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.primary-button:disabled:hover {
+  background: var(--accent);
+}
+
 .secondary-button {
   color: var(--text);
   background: var(--surface);
@@ -1198,6 +1207,33 @@ a {
 .dialog-sheet h2,
 .bottom-sheet h2 {
   margin: 0 0 10px;
+}
+
+.insert-link-dialog {
+  display: grid;
+  gap: 14px;
+}
+
+.dialog-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.dialog-field input {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.dialog-field input:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 22%, transparent);
+  outline: none;
 }
 
 .share-link-row {

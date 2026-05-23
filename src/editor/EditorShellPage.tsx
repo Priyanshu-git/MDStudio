@@ -1,4 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import type { User } from 'firebase/auth'
 import {
   Bold,
@@ -42,7 +43,7 @@ import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
 import { updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
-import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
+import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle } from './MarkdownEditor'
 import type { DesktopViewMode, MobileTab, SaveStatus, ThemeName } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
 
@@ -60,6 +61,13 @@ type ToolbarItem = {
 }
 
 type DesktopSidebarTab = 'documents' | 'outline'
+
+type LinkDialogState = {
+  mode: 'link' | 'image'
+  text: string
+  url: string
+  selection: EditorSelectionSnapshot | null
+}
 
 type ThemeOption = {
   value: ThemeName
@@ -227,7 +235,9 @@ export function EditorShellPage() {
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
   const themeMenuRef = useRef<HTMLDivElement | null>(null)
+  const linkTextInputRef = useRef<HTMLInputElement | null>(null)
   const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
+  const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -284,8 +294,19 @@ export function EditorShellPage() {
   const showSidebar = true
   const showEditor = desktopViewMode === 'edit' || desktopViewMode === 'split'
   const showPreview = desktopViewMode === 'preview' || desktopViewMode === 'split'
+  const isLinkDialogOpen = linkDialog !== null
   const selectedThemeLabel =
     themeGroups.flatMap((group) => group.options).find((option) => option.value === theme)?.label ?? 'Theme'
+
+  const openLinkDialog = useCallback((action: 'link' | 'image') => {
+    const selection = editorRef.current?.getSelectionSnapshot() ?? null
+    setLinkDialog({
+      mode: action,
+      text: selection?.text ?? '',
+      url: '',
+      selection,
+    })
+  }, [])
 
   useEffect(() => {
     void hydrateDocument()
@@ -403,12 +424,34 @@ export function EditorShellPage() {
       if (!editorRef.current) {
         return
       }
+      if (pendingInsertAction === 'link' || pendingInsertAction === 'image') {
+        openLinkDialog(pendingInsertAction)
+        setPendingInsertAction(null)
+        return
+      }
       editorRef.current.applyAction(pendingInsertAction)
       setPendingInsertAction(null)
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [mobileTab, pendingInsertAction])
+  }, [mobileTab, openLinkDialog, pendingInsertAction])
+
+  useEffect(() => {
+    if (!isLinkDialogOpen) {
+      return
+    }
+
+    linkTextInputRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setLinkDialog(null)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isLinkDialogOpen])
 
   async function guardedOpenDocument(docId: string) {
     if (hasUnsavedChanges() && !window.confirm('You have unsaved changes. Save before leaving?')) {
@@ -421,10 +464,37 @@ export function EditorShellPage() {
     setIsInsertOpen(false)
     setMobileTab('write')
     if (editorRef.current) {
+      if (action === 'link' || action === 'image') {
+        openLinkDialog(action)
+        return
+      }
       editorRef.current.applyAction(action)
       return
     }
     setPendingInsertAction(action)
+  }
+
+  function handleLinkDialogSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!linkDialog) {
+      return
+    }
+
+    const url = linkDialog.url.trim()
+    const text = linkDialog.text.trim()
+    if (!url || (linkDialog.mode === 'link' && !text)) {
+      return
+    }
+
+    editorRef.current?.applyLink(
+      {
+        text,
+        url,
+        image: linkDialog.mode === 'image',
+      },
+      linkDialog.selection ?? undefined,
+    )
+    setLinkDialog(null)
   }
 
   function handleRedo() {
@@ -910,6 +980,51 @@ export function EditorShellPage() {
               </div>
             ) : null}
           </section>
+        </div>
+      ) : null}
+
+      {linkDialog ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setLinkDialog(null)}>
+          <form
+            className="dialog-sheet insert-link-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="insert-link-title"
+            onMouseDown={(event) => event.stopPropagation()}
+            onSubmit={handleLinkDialogSubmit}
+          >
+            <h2 id="insert-link-title">
+              {linkDialog.mode === 'image' ? 'Insert image' : 'Insert link'}
+            </h2>
+            <label className="dialog-field">
+              <span>{linkDialog.mode === 'image' ? 'Alt text' : 'Text'}</span>
+              <input
+                ref={linkTextInputRef}
+                value={linkDialog.text}
+                onChange={(event) => setLinkDialog({ ...linkDialog, text: event.target.value })}
+              />
+            </label>
+            <label className="dialog-field">
+              <span>{linkDialog.mode === 'image' ? 'Image URL' : 'URL'}</span>
+              <input
+                value={linkDialog.url}
+                onChange={(event) => setLinkDialog({ ...linkDialog, url: event.target.value })}
+                inputMode="url"
+              />
+            </label>
+            <div className="dialog-actions">
+              <button type="button" className="secondary-button" onClick={() => setLinkDialog(null)}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={!linkDialog.url.trim() || (linkDialog.mode === 'link' && !linkDialog.text.trim())}
+              >
+                Insert
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 

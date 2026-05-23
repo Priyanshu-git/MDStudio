@@ -28,6 +28,12 @@ export type MarkdownInsertResult = {
   selectionEnd: number
 }
 
+export type MarkdownLinkInsertOptions = {
+  text: string
+  url: string
+  image?: boolean
+}
+
 type LineTransform = 'h1' | 'h2' | 'checklist' | 'bullet-list' | 'numbered-list' | 'quote'
 
 type LineBounds = {
@@ -119,6 +125,20 @@ function applyLink(value: string, start: number, end: number, image = false): Ma
     return result(value, start, end, insert, urlPosition)
   }
   return result(value, start, end, insert, labelStart)
+}
+
+export function applyMarkdownLinkInsert(
+  value: string,
+  options: MarkdownLinkInsertOptions,
+  selectionStart = value.length,
+  selectionEnd = selectionStart,
+): MarkdownInsertResult {
+  const { start, end } = orderedSelection(selectionStart, selectionEnd)
+  const prefix = options.image ? '![' : '['
+  const text = options.text
+  const url = options.url
+  const insert = `${prefix}${text}](${url})`
+  return result(value, start, end, insert, start + insert.length)
 }
 
 function lineBounds(value: string, start: number, end: number): LineBounds {

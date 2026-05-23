@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMarkdownInsert } from './markdownInsert'
+import { applyMarkdownInsert, applyMarkdownLinkInsert } from './markdownInsert'
 
 describe('applyMarkdownInsert', () => {
   it('inserts empty inline markers at the cursor', () => {
@@ -56,6 +56,33 @@ describe('applyMarkdownInsert', () => {
     const image = applyMarkdownInsert('', 'image', 0, 0)
     expect(image.value).toBe('![]()')
     expect(image.selectionStart).toBe(2)
+  })
+
+  it('inserts complete links and images from popup values', () => {
+    const selectedLink = applyMarkdownLinkInsert(
+      'Read docs',
+      { text: 'Read', url: 'https://example.com' },
+      0,
+      4,
+    )
+    expect(selectedLink.value).toBe('[Read](https://example.com) docs')
+    expect(selectedLink.selectionStart).toBe('[Read](https://example.com)'.length)
+
+    const typedLink = applyMarkdownLinkInsert(
+      'Visit ',
+      { text: 'Site', url: 'https://example.com' },
+      6,
+      6,
+    )
+    expect(typedLink.value).toBe('Visit [Site](https://example.com)')
+
+    const image = applyMarkdownLinkInsert(
+      'Logo',
+      { text: 'Logo', url: 'https://example.com/logo.png', image: true },
+      0,
+      4,
+    )
+    expect(image.value).toBe('![Logo](https://example.com/logo.png)')
   })
 
   it('wraps and unwraps fenced and math blocks', () => {
