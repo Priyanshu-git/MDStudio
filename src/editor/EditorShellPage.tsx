@@ -43,6 +43,7 @@ import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
 import { updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
+import { useAutoHideAppbar } from '../hooks/useAutoHideAppbar'
 import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle } from './MarkdownEditor'
 import type { DesktopViewMode, MobileTab, SaveStatus, ThemeName } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
@@ -235,6 +236,7 @@ export function EditorShellPage() {
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
   const themeMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobilePanelRef = useRef<HTMLElement | null>(null)
   const linkTextInputRef = useRef<HTMLInputElement | null>(null)
   const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null)
@@ -297,6 +299,11 @@ export function EditorShellPage() {
   const isLinkDialogOpen = linkDialog !== null
   const selectedThemeLabel =
     themeGroups.flatMap((group) => group.options).find((option) => option.value === theme)?.label ?? 'Theme'
+  const isMobileAppbarHidden = useAutoHideAppbar({
+    enabled: isMobileViewport,
+    resetKey: mobileTab,
+    scrollRef: mobilePanelRef,
+  })
 
   const openLinkDialog = useCallback((action: 'link' | 'image') => {
     const selection = editorRef.current?.getSelectionSnapshot() ?? null
@@ -782,7 +789,7 @@ export function EditorShellPage() {
         )}
       </header>
 
-      <header className="mobile-topbar">
+      <header className={isMobileAppbarHidden && !isProfileMenuOpen ? 'mobile-topbar appbar-hidden' : 'mobile-topbar'}>
         <div className="mobile-title-block">
           <strong>{mobileTab === 'files' ? 'Markdown Studio' : draftTitle}</strong>
         </div>
@@ -885,7 +892,7 @@ export function EditorShellPage() {
           ) : null}
         </section>
 
-        <section className={`mobile-panel-surface mobile-panel-${mobileTab}`}>
+        <section ref={mobilePanelRef} className={`mobile-panel-surface mobile-panel-${mobileTab}`}>
           {isMobileViewport && mobileTab === 'write' ? (
             <>
               <EditorToolbar onInsert={handleInsert} onRedo={handleRedo} onUndo={handleUndo} compact />

@@ -139,6 +139,8 @@ describe('Sharing flow', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'Shared Title' })).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: 'Shared document menu' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Theme')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Original' })).not.toBeInTheDocument()
   })
@@ -161,6 +163,7 @@ describe('Sharing flow', () => {
       </BrowserRouter>,
     )
 
+    await screen.findByRole('heading', { level: 1, name: 'Shared Copy Source' })
     fireEvent.click(await screen.findByRole('button', { name: 'Make a Copy' }))
 
     await waitFor(async () => {
@@ -192,6 +195,7 @@ describe('Sharing flow', () => {
       </BrowserRouter>,
     )
 
+    await screen.findByRole('heading', { level: 1, name: 'Owner Cloud Title' })
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Original' }))
 
     await waitFor(async () => {

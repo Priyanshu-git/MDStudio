@@ -405,6 +405,28 @@ describe('App routing shell', () => {
     expect(screen.getByText('Priyanshu Gaurav')).toBeInTheDocument()
   })
 
+  it('hides and shows the mobile appbar from active panel scroll direction', () => {
+    mockMobileViewport(true)
+    useAppStore.setState({ isHydrated: true, draftTitle: 'Mobile Test', draftMarkdown: 'Body' })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const topbar = container.querySelector<HTMLElement>('.mobile-topbar')!
+    const panel = container.querySelector<HTMLElement>('.mobile-panel-surface')!
+
+    Object.defineProperty(panel, 'scrollTop', { configurable: true, value: 30 })
+    fireEvent.scroll(panel)
+    expect(topbar).toHaveClass('appbar-hidden')
+
+    Object.defineProperty(panel, 'scrollTop', { configurable: true, value: 12 })
+    fireEvent.scroll(panel)
+    expect(topbar).not.toHaveClass('appbar-hidden')
+  })
+
   it('queues mobile sheet toolbar actions until the write editor is mounted', async () => {
     mockMobileViewport(true)
     useAppStore.setState({
@@ -600,5 +622,99 @@ describe('App routing shell', () => {
     })
     expect(screen.getByText('Shared Document')).toBeInTheDocument()
     expect(screen.queryByText(/Share ID:/)).not.toBeInTheDocument()
+  })
+
+  it('shows shared document actions directly on desktop and switches theme', async () => {
+    authMockState.currentUser = {
+      uid: 'viewer',
+      displayName: 'Viewer',
+      email: 'viewer@example.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/share/public-123')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-123',
+      title: 'Shared Menu Test',
+      markdown: '# Shared Menu Test',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Shared Menu Test' })
+    expect(screen.queryByRole('button', { name: 'Shared document menu' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy Link' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'blue-eclipse' } })
+    expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+  })
+
+  it('opens shared document menu actions on mobile and switches theme', async () => {
+    mockMobileViewport(true)
+    authMockState.currentUser = {
+      uid: 'viewer',
+      displayName: 'Viewer',
+      email: 'viewer@example.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/share/public-123-mobile')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-123-mobile',
+      title: 'Shared Mobile Menu Test',
+      markdown: '# Shared Mobile Menu Test',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Shared Mobile Menu Test' })
+    expect(screen.queryByRole('button', { name: 'Copy Link' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Make a Copy' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Shared document menu' }))
+    expect(screen.getByRole('menuitem', { name: 'Copy Link' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Make a Copy' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'blue-eclipse' } })
+    expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+  })
+
+  it('hides and shows the shared appbar from window scroll direction', async () => {
+    window.history.pushState({}, '', '/share/public-scroll')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-scroll',
+      title: 'Shared Scroll Test',
+      markdown: '# Shared Scroll Test',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Shared Scroll Test' })
+    const topbar = container.querySelector<HTMLElement>('.shared-topbar')!
+
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 30 })
+    fireEvent.scroll(window)
+    expect(topbar).toHaveClass('appbar-hidden')
+
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 12 })
+    fireEvent.scroll(window)
+    expect(topbar).not.toHaveClass('appbar-hidden')
   })
 })

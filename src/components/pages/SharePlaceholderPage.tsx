@@ -1,17 +1,61 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Copy, Edit3, LogIn, Share2 } from 'lucide-react'
+import { Copy, Edit3, LogIn, MoreVertical, Share2 } from 'lucide-react'
 import { MarkdownPreview } from '../../preview/MarkdownPreview'
 import { getSharedDocumentById } from '../../storage/shareDocuments'
 import { createDocument, getDocumentById, updateDocument } from '../../storage/documents'
-import type { Document, SharedDocument } from '../../types'
+import type { Document, SharedDocument, ThemeName } from '../../types'
 import { useAppStore } from '../../state/useAppStore'
 import { listenToAuthState, signInWithGoogle } from '../../firebase/auth'
+import { useAutoHideAppbar } from '../../hooks/useAutoHideAppbar'
+
+const themeGroups = [
+  {
+    label: 'Light',
+    options: [
+      { value: 'github-light', label: 'GitHub Light' },
+      { value: 'pastel-mint', label: 'Lavender Frost' },
+      { value: 'minimal-ivory', label: 'Minimal Ivory' },
+    ],
+  },
+  {
+    label: 'Dark',
+    options: [
+      { value: 'github-dark', label: 'GitHub Dark' },
+      { value: 'one-dark', label: 'One Dark' },
+      { value: 'blue-eclipse', label: 'Blue Eclipse' },
+    ],
+  },
+] as const
+
+function useIsCompactSharedTopbar() {
+  const [isCompact, setIsCompact] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia('(max-width: 767px)').matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleChange = () => setIsCompact(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  return isCompact
+}
 
 export function SharePlaceholderPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const theme = useAppStore((state) => state.theme)
   const setTheme = useAppStore((state) => state.setTheme)
   const setActiveDocId = useAppStore((state) => state.setActiveDocId)
@@ -26,6 +70,9 @@ export function SharePlaceholderPage() {
   const [isOpeningOriginal, setIsOpeningOriginal] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false)
+  const isCompactTopbar = useIsCompactSharedTopbar()
+  const isAppbarHidden = useAutoHideAppbar()
 
   const shareUrl = useMemo(() => {
     if (!id) {
@@ -38,6 +85,43 @@ export function SharePlaceholderPage() {
   const isOwner = Boolean(user && document?.ownerUid && user.uid === document.ownerUid)
 
   useEffect(() => listenToAuthState(setUser), [])
+
+  useEffect(() => {
+    if (!isShareMenuOpen) {
+      return
+    }
+
+    function closeMenu() {
+      setIsShareMenuOpen(false)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (menuRef.current?.contains(target)) {
+        return
+      }
+      closeMenu()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeMenu()
+      }
+    }
+
+    window.document.addEventListener('pointerdown', handlePointerDown)
+    window.document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.document.removeEventListener('pointerdown', handlePointerDown)
+      window.document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isShareMenuOpen])
+
+  useEffect(() => {
+    if (!isCompactTopbar) {
+      setIsShareMenuOpen(false)
+    }
+  }, [isCompactTopbar])
 
   useEffect(() => {
     let isCurrent = true
@@ -89,6 +173,7 @@ export function SharePlaceholderPage() {
     }
 
     setIsCreatingDraft(true)
+    setIsShareMenuOpen(false)
     try {
       const localDoc = await createDocument({
         title: `Copy of ${document.title}`,
@@ -112,6 +197,7 @@ export function SharePlaceholderPage() {
 
     setActionError(null)
     setIsOpeningOriginal(true)
+    setIsShareMenuOpen(false)
     try {
       const existingLocalDoc = document.sourceDocId ? await getDocumentById(document.sourceDocId) : undefined
       let localDoc: Document
@@ -147,6 +233,7 @@ export function SharePlaceholderPage() {
   }
 
   async function handleCopyShareUrl() {
+    setIsShareMenuOpen(false)
     if (!navigator.clipboard) {
       setCopyState('failed')
       return
@@ -161,22 +248,107 @@ export function SharePlaceholderPage() {
 
   return (
     <main className="shared-shell">
-      <header className="shared-topbar">
+      <header className={isAppbarHidden && !isShareMenuOpen ? 'shared-topbar appbar-hidden' : 'shared-topbar'}>
         <strong>{document?.title ?? 'Shared Document'}</strong>
-        <select className="theme-select" value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
-          <option value="__theme-group-light" disabled className="theme-select-group-label">
-            LIGHT
-          </option>
-          <option value="github-light">GitHub Light</option>
-          <option value="pastel-mint">Lavender Frost</option>
-          <option value="minimal-ivory">Minimal Ivory</option>
-          <option value="__theme-group-dark" disabled className="theme-select-group-label">
-            DARK
-          </option>
-          <option value="github-dark">GitHub Dark</option>
-          <option value="one-dark">One Dark</option>
-          <option value="blue-eclipse">Blue Eclipse</option>
-        </select>
+        {isCompactTopbar ? (
+          <div className="shared-menu-anchor" ref={menuRef}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Shared document menu"
+              aria-haspopup="menu"
+              aria-expanded={isShareMenuOpen}
+              onClick={() => setIsShareMenuOpen((isOpen) => !isOpen)}
+            >
+              <MoreVertical size={20} />
+            </button>
+            {isShareMenuOpen ? (
+              <section className="shared-menu-popover" role="menu" aria-label="Shared document actions">
+                <select
+                  className="shared-theme-select"
+                  aria-label="Theme"
+                  value={theme}
+                  onChange={(event) => {
+                    setTheme(event.target.value as ThemeName)
+                    setIsShareMenuOpen(false)
+                  }}
+                >
+                  {themeGroups.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <div className="shared-menu-divider" />
+                <button type="button" className="shared-menu-action" role="menuitem" onClick={() => void handleCopyShareUrl()}>
+                  <Copy size={16} />
+                  Copy Link
+                </button>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className="shared-menu-action primary"
+                    role="menuitem"
+                    onClick={() => void handleEditOriginal()}
+                    disabled={isOpeningOriginal}
+                  >
+                    <Edit3 size={16} />
+                    {isOpeningOriginal ? 'Opening...' : 'Edit Original'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="shared-menu-action primary"
+                    role="menuitem"
+                    onClick={() => void handleMakeCopy()}
+                    disabled={isCreatingDraft}
+                  >
+                    {user ? <Copy size={16} /> : <LogIn size={16} />}
+                    {isCreatingDraft ? 'Making Copy...' : 'Make a Copy'}
+                  </button>
+                )}
+              </section>
+            ) : null}
+          </div>
+        ) : (
+          <div className="shared-topbar-actions">
+            <select
+              className="theme-select"
+              aria-label="Theme"
+              value={theme}
+              onChange={(event) => setTheme(event.target.value as ThemeName)}
+            >
+              {themeGroups.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
+              <Copy size={16} />
+              Copy Link
+            </button>
+            {isOwner ? (
+              <button type="button" className="primary-button" onClick={() => void handleEditOriginal()} disabled={isOpeningOriginal}>
+                <Edit3 size={16} />
+                {isOpeningOriginal ? 'Opening...' : 'Edit Original'}
+              </button>
+            ) : (
+              <button type="button" className="primary-button" onClick={() => void handleMakeCopy()} disabled={isCreatingDraft}>
+                {user ? <Copy size={16} /> : <LogIn size={16} />}
+                {isCreatingDraft ? 'Making Copy...' : 'Make a Copy'}
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {isLoading ? <section className="shared-state">Loading shared document...</section> : null}
@@ -193,23 +365,6 @@ export function SharePlaceholderPage() {
             {actionError ? <p className="error-text">{actionError}</p> : null}
             <MarkdownPreview markdown={document.markdown} theme={theme} />
           </section>
-          <footer className="shared-actions">
-            <button type="button" className="secondary-button" onClick={() => void handleCopyShareUrl()}>
-              <Copy size={16} />
-              Copy Link
-            </button>
-            {isOwner ? (
-              <button type="button" className="primary-button" onClick={() => void handleEditOriginal()} disabled={isOpeningOriginal}>
-                <Edit3 size={16} />
-                {isOpeningOriginal ? 'Opening...' : 'Edit Original'}
-              </button>
-            ) : (
-              <button type="button" className="primary-button" onClick={() => void handleMakeCopy()} disabled={isCreatingDraft}>
-                {user ? <Copy size={16} /> : <LogIn size={16} />}
-                {isCreatingDraft ? 'Making Copy...' : 'Make a Copy'}
-              </button>
-            )}
-          </footer>
           {copyState === 'copied' ? <div className="studio-banner">Link copied</div> : null}
           {copyState === 'failed' ? <div className="studio-banner error">Copy failed</div> : null}
         </>

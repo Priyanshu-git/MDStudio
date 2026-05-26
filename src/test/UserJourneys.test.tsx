@@ -78,7 +78,8 @@ describe('User Journeys', () => {
     expect(previewButton).toHaveClass('active')
 
     // 5. Change theme
-    fireEvent.change(screen.getByDisplayValue('GitHub Light'), { target: { value: 'blue-eclipse' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Select theme' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Blue Eclipse' }))
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
 
     // 6. Manual save is required before reload persistence
