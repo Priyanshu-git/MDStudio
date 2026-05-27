@@ -27,8 +27,11 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 
 - Local document editing with dirty-state tracking, manual save, recent documents, and IndexedDB persistence.
 - Desktop edit, split, and preview modes.
+- Desktop document/outline sidebar with heading navigation.
 - Mobile write, preview, outline, and files tabs.
-- Markdown preview with GFM, math, Mermaid, and syntax-highlighted code blocks.
+- Markdown insert toolbar for headings, links, images by URL, tables, code, math, Mermaid, lists, quotes, and rules.
+- Markdown preview with GFM, math, Mermaid, source-line heading metadata, and syntax-highlighted code blocks.
+- Code-block copy, Mermaid SVG/PNG export, and lazy-loaded heavy renderers.
 - Theme persistence for `github-light`, `github-dark`, `pastel-mint`, `minimal-ivory`, `one-dark`, and `blue-eclipse`.
 - `.md` import plus Markdown, HTML, and browser print/PDF export.
 - Google sign-in for sharing, an account menu, and inline sign-out confirmation.
@@ -42,13 +45,14 @@ For more details, see [Offline Support](docs/OFFLINE.md).
 
 ## Firestore Sharing
 
-Firestore powers manual sharing via `/share/:id` while the editor remains local-first with IndexedDB. Creating and updating share links requires Google sign-in; reading a shared link is public by ID.
+Firestore powers manual sharing via `/share/:id` while the editor remains local-first with IndexedDB. Creating share links requires Google sign-in; reading a shared link is public by ID. Owner update support exists in the storage service and Firestore rules, but the current editor dialog only exposes link creation and copying.
 
 See [Firebase Firestore Setup](docs/FIREBASE.md) for environment setup, collection shape, and security rules.
 
 ## Scope Boundaries
 
 In scope:
+
 - CSR React app
 - Local markdown editing shell with CodeMirror
 - Local persistence with Dexie/IndexedDB
@@ -59,6 +63,7 @@ In scope:
 - Local import/export flows
 
 Out of scope:
+
 - SSR/SEO
 - Collaboration
 - Real-time multi-user editing
@@ -74,6 +79,8 @@ Out of scope:
 - Local storage services: [/src/storage/documents.ts](D:/Code/MD%20Studio/src/storage/documents.ts)
 - Share storage services: [/src/storage/shareDocuments.ts](D:/Code/MD%20Studio/src/storage/shareDocuments.ts)
 - Firebase auth helpers: [/src/firebase/auth.ts](D:/Code/MD%20Studio/src/firebase/auth.ts)
+- Markdown insert helpers: [/src/editor/markdownInsert.ts](D:/Code/MD%20Studio/src/editor/markdownInsert.ts)
+- Markdown preview pipeline: [/src/preview/MarkdownPreview.tsx](D:/Code/MD%20Studio/src/preview/MarkdownPreview.tsx)
 
 ## Documentation Index
 

@@ -1,13 +1,16 @@
 # Theming
 
 ## Theme Scope
+
 Application-wide theme with coordinated behavior across:
+
 - UI shell
 - Markdown preview
 - Syntax highlighting blocks
 - Mermaid diagrams
 
 ## Required Theme Set
+
 - Light:
   - `github-light` (GitHub Light)
   - `pastel-mint` (Lavender Frost)
@@ -18,6 +21,7 @@ Application-wide theme with coordinated behavior across:
   - `blue-eclipse` (Blue Eclipse)
 
 ## Rules
+
 - Theme changes must propagate consistently to all surfaces.
 - New themes must include explicit mappings for all four theme areas.
 - Theme preference is stored locally in IndexedDB app state.

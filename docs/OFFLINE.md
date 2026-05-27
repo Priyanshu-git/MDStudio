@@ -14,6 +14,7 @@ Markdown Studio is designed to be fully functional offline.
 - **Local documents:** Reopen recent documents from IndexedDB.
 - **Import:** Import `.md` files into a local draft.
 - **Export:** Export Markdown and HTML locally; PDF uses the browser print flow.
+- **Diagram export:** Mermaid SVG/PNG export works for diagrams that render from local markdown.
 - **Rendering:** Full markdown rendering including:
   - GFM (GitHub Flavored Markdown)
   - Math (KaTeX)
@@ -23,7 +24,8 @@ Markdown Studio is designed to be fully functional offline.
 
 ## Limitations
 
-- **Sign-in and sharing:** Google sign-in, Firestore publish/update, and loading uncached shared links require a network connection.
+- **Sign-in and sharing:** Google sign-in, Firestore publishing, the underlying owner update service, and loading uncached shared links require a network connection.
+- **Share update UI:** The Firestore service and rules support owner updates, but the current share dialog does not expose an update action after a link exists.
 - **Shared documents:** `/share/:id` reads Firestore and is not the canonical editable source.
 - **Remote Images:** Markdown images pointing to external URLs will not be available offline unless they have been previously cached by your browser's standard cache.
 - **Initial Installation:** You must visit the application once while online to allow the service worker to install and cache the assets.
@@ -36,6 +38,7 @@ Vite config redirects `TMPDIR`, `TMP`, and `TEMP` to `node_modules/.vite-temp` b
 ## Installation
 
 You can "install" Markdown Studio to your desktop or mobile device:
+
 1. Open Markdown Studio in your browser.
 2. Look for the "Install" icon in the address bar (Chrome/Edge) or use "Add to Home Screen" (iOS/Android).
 3. The app will then appear in your app drawer or desktop and open in its own window.

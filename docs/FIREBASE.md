@@ -25,10 +25,12 @@ Google sign-in uses Firebase Auth with `signInWithPopup` and `prompt: select_acc
 - Creating a share link writes a Firestore document in `sharedDocuments`.
 - After link creation, the local document is marked as Firebase-backed with `sourceShareId` and `sourceOwnerUid`.
 - The current share dialog shows the existing link and copy action for already-linked documents; it does not expose an update-link action.
+- The storage service and Firestore rules support owner updates, but the current editor UI intentionally does not expose an update action after a link exists.
 - `/share/:id` loads title, markdown, and owner metadata from Firestore in read-only mode.
 - Shared pages are public by ID.
 - Owners see `Edit Original`; non-owners see `Make a Copy`.
 - `Edit Original` reuses the shared document's `sourceDocId` when it exists locally, otherwise creates a Firebase-sourced local document.
+- Non-owner copies are new local documents and do not keep Firebase source metadata.
 - Theme is not stored in Firestore; shared pages use the app-level local theme preference.
 
 ## Firestore Document Shape

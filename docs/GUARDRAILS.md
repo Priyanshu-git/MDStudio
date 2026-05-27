@@ -8,10 +8,12 @@
 2. **Rendering Security**
    - Raw HTML rendering stays disabled.
    - No support for `script`, `iframe`, inline JS, or arbitrary embedded HTML.
+   - Link and image URL sanitization must continue to reject unsafe schemes.
 
 3. **Architecture Boundary**
    - Mermaid rendering must happen in a dedicated React renderer path, not inside markdown parse transforms.
    - Fenced code blocks must route through custom code renderer components.
+   - Heavy renderers such as Mermaid and Shiki should remain lazy-loaded unless there is a measured reason to change that.
 
 4. **Data Source of Truth**
    - IndexedDB is the canonical editable document store.
@@ -36,6 +38,7 @@
 ## Override Process
 
 If a soft guardrail must be overridden:
+
 1. Document rationale in PR.
 2. Add follow-up ADR note in `docs/DECISIONS.md`.
 3. Include targeted test coverage to protect against regression.
