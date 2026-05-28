@@ -134,6 +134,11 @@ const statusLabels: Record<SaveStatus, string> = {
   error: 'Error',
 }
 
+function formatPageTitle(title: string): string {
+  const normalizedTitle = title.trim() || 'Untitled Document'
+  return `${normalizedTitle} | MD Studio`
+}
+
 function buildOutline(markdown: string): OutlineItem[] {
   return markdown
     .split('\n')
@@ -323,6 +328,10 @@ export function EditorShellPage() {
     void hydrateDocument()
     void refreshDocuments()
   }, [hydrateDocument, refreshDocuments])
+
+  useEffect(() => {
+    document.title = formatPageTitle(draftTitle)
+  }, [draftTitle])
 
   useEffect(() => listenToAuthState((nextUser) => {
     setUser(nextUser)
@@ -736,7 +745,7 @@ export function EditorShellPage() {
           <span className="app-mark" aria-hidden="true">
             <Edit3 size={18} />
           </span>
-          <strong>Markdown Studio</strong>
+          <strong>MD Studio</strong>
         </div>
         <input
           className="title-input"
@@ -839,7 +848,7 @@ export function EditorShellPage() {
 
       <header className={isMobileAppbarHidden && !isProfileMenuOpen ? 'mobile-topbar appbar-hidden' : 'mobile-topbar'}>
         <div className="mobile-title-block">
-          <strong>{mobileTab === 'files' ? 'Markdown Studio' : draftTitle}</strong>
+          <strong>{mobileTab === 'files' ? 'MD Studio' : draftTitle}</strong>
         </div>
         <span className={`save-badge save-badge-${saveStatus}`}>{statusLabels[saveStatus]}</span>
         {user ? (

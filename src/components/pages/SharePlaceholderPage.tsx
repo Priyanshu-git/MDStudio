@@ -29,6 +29,11 @@ const themeGroups = [
   },
 ] as const
 
+function formatPageTitle(title?: string | null): string {
+  const normalizedTitle = title?.trim()
+  return normalizedTitle ? `${normalizedTitle} | MD Studio` : 'MD Studio'
+}
+
 function useIsCompactSharedTopbar() {
   const [isCompact, setIsCompact] = useState(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -122,6 +127,10 @@ export function SharePlaceholderPage() {
       setIsShareMenuOpen(false)
     }
   }, [isCompactTopbar])
+
+  useEffect(() => {
+    window.document.title = formatPageTitle(document?.title)
+  }, [document?.title])
 
   useEffect(() => {
     let isCurrent = true

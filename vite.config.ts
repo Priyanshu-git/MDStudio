@@ -17,7 +17,7 @@ export default defineConfig({
       disable: process.env.DISABLE_PWA === 'true',
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Markdown Studio',
+        name: 'MD Studio',
         short_name: 'MD Studio',
         description: 'Local-first markdown editor and preview',
         theme_color: '#ffffff',

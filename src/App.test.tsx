@@ -72,6 +72,7 @@ describe('App routing shell', () => {
       saveError: null,
     })
     HTMLElement.prototype.scrollTo = vi.fn() as unknown as typeof HTMLElement.prototype.scrollTo
+    document.title = 'MD Studio'
     vi.mocked(publishSharedDocument).mockResolvedValue({ shareId: 'share-id' })
     vi.mocked(getSharedDocumentById).mockResolvedValue(null)
     vi.mocked(updateSharedDocument).mockResolvedValue()
@@ -84,7 +85,25 @@ describe('App routing shell', () => {
         <App />
       </BrowserRouter>,
     )
-    expect(screen.getByText('Markdown Studio')).toBeInTheDocument()
+    expect(screen.getByText('MD Studio')).toBeInTheDocument()
+    expect(document.title).toBe('Markdown Rendering Test File | MD Studio')
+  })
+
+  it('updates the browser title from the editor draft title', async () => {
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(document.title).toBe('Markdown Rendering Test File | MD Studio')
+
+    fireEvent.change(screen.getByDisplayValue('Markdown Rendering Test File'), { target: { value: 'Draft Rename' } })
+
+    await waitFor(() => {
+      expect(document.title).toBe('Draft Rename | MD Studio')
+    })
   })
 
   it('switches to preview mode from editor', () => {
@@ -662,6 +681,7 @@ describe('App routing shell', () => {
       expect(screen.getByText('Shared document not found.')).toBeInTheDocument()
     })
     expect(screen.getByText('Shared Document')).toBeInTheDocument()
+    expect(document.title).toBe('MD Studio')
     expect(screen.queryByText(/Share ID:/)).not.toBeInTheDocument()
   })
 
@@ -689,6 +709,7 @@ describe('App routing shell', () => {
     )
 
     await screen.findByRole('heading', { level: 1, name: 'Shared Menu Test' })
+    expect(document.title).toBe('Shared Menu Test | MD Studio')
     expect(screen.queryByRole('button', { name: 'Shared document menu' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy Link' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
