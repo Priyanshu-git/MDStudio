@@ -1,4 +1,9 @@
 :root {
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-document-heading: var(--font-ui);
+  --font-document-body: var(--font-ui);
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-code-size: 14px;
   --bg: #f6f8fb;
   --text: #111827;
   --surface: #ffffff;
@@ -230,7 +235,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
 }
@@ -455,7 +460,7 @@ a {
   padding: 4px 8px;
   font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--text) 58%, var(--surface));
 }
@@ -527,7 +532,7 @@ a {
   color: var(--text);
   background: var(--surface);
   border-color: var(--border);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .secondary-button:hover,
@@ -684,7 +689,7 @@ a {
   color: var(--text);
   background: var(--surface-soft);
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .account-menu-action:hover {
@@ -805,7 +810,7 @@ a {
   color: var(--muted);
   font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .document-list,
@@ -887,7 +892,7 @@ a {
 }
 
 .document-title {
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .document-source-icon {
@@ -991,18 +996,18 @@ a {
 .markdown-editor {
   min-height: 0;
   flex: 1;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-code);
 }
 
 .cm-editor {
   height: 100%;
   background: var(--surface);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: var(--font-code-size);
 }
 
 .cm-scroller {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-code);
 }
 
 .cm-gutters {
@@ -1083,26 +1088,45 @@ a {
 
 .markdown-doc {
   max-width: 860px;
+  font-family: var(--font-document-body);
   color: var(--text);
   font-size: 1rem;
-  line-height: 1.68;
+  line-height: 1.62;
+}
+
+.markdown-doc h1,
+.markdown-doc h2,
+.markdown-doc h3,
+.markdown-doc h4,
+.markdown-doc h5,
+.markdown-doc h6 {
+  font-family: var(--font-document-heading);
 }
 
 .markdown-doc h1 {
   margin: 0 0 0.7em;
   font-size: 2rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 
 .markdown-doc h2 {
   margin: 1.5em 0 0.5em;
   font-size: 1.45rem;
+  font-weight: 700;
   line-height: 1.28;
 }
 
 .markdown-doc h3 {
   margin: 1.3em 0 0.45em;
   font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.markdown-doc h4,
+.markdown-doc h5,
+.markdown-doc h6 {
+  font-weight: 600;
 }
 
 .markdown-doc p,
@@ -1156,6 +1180,8 @@ a {
 }
 
 .code-inline {
+  font-family: var(--font-code);
+  font-size: 0.92em;
   border-radius: 6px;
   padding: 0.12rem 0.35rem;
   background: var(--code-inline-bg);
@@ -1193,6 +1219,8 @@ a {
 .line-number-gutter {
   margin: 0;
   padding: 12px 10px;
+  font-family: var(--font-code);
+  font-size: var(--font-code-size);
   text-align: right;
   color: var(--editor-gutter);
   background: var(--code-gutter-bg);
@@ -1207,6 +1235,9 @@ a {
 .code-highlight pre {
   margin: 0;
   padding: 12px;
+  font-family: var(--font-code);
+  font-size: var(--font-code-size);
+  line-height: 1.6;
 }
 
 .mermaid-block > div:last-child {
@@ -1264,7 +1295,7 @@ a {
   display: grid;
   gap: 6px;
   color: var(--text);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .dialog-field input {
@@ -1401,7 +1432,7 @@ a {
   color: var(--text);
   background: var(--input-bg);
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -1424,7 +1455,7 @@ a {
   color: var(--text);
   background: transparent;
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .shared-menu-action:hover,
@@ -1716,6 +1747,7 @@ select:focus-visible {
     margin: 0;
     color: var(--muted);
     font-size: 0.76rem;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
   }
 
