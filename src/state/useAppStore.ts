@@ -3,6 +3,8 @@ import type {
   DesktopViewMode,
   Document,
   MobileTab,
+  RecentDocumentItem,
+  RecentDocumentsState,
   SaveStatus,
   ThemeName,
 } from '../types'
@@ -16,6 +18,7 @@ import {
   setThemePreference,
   updateDocument,
 } from '../storage/documents'
+import { refreshLocalRecentDocuments, refreshRecentDocumentsForUser } from '../storage/documentSync'
 
 const DEFAULT_MARKDOWN = `# Markdown Rendering Test File
 
@@ -76,6 +79,8 @@ type AppState = {
   activeDocId: string | null
   activeShareId: string | null
   documents: Document[]
+  recentDocuments: RecentDocumentItem[]
+  recentDocumentsState: RecentDocumentsState
   draftTitle: string
   draftMarkdown: string
   lastLocalSavedTitle: string
@@ -98,6 +103,8 @@ type AppState = {
   clearShareLink: () => void
   setLastCloudSavedSnapshot: (title: string | null, markdown: string | null) => void
   refreshDocuments: () => Promise<void>
+  clearRecentDocumentsForSignedOut: () => void
+  refreshRecentDocuments: (uid?: string | null) => Promise<void>
   hydrateTheme: () => Promise<void>
   hydrateDocument: () => Promise<void>
   createNewDraft: () => void
@@ -122,6 +129,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeDocId: null,
   activeShareId: null,
   documents: [],
+  recentDocuments: [],
+  recentDocumentsState: 'signed-out',
   draftTitle: 'Markdown Rendering Test File',
   draftMarkdown: DEFAULT_MARKDOWN,
   lastLocalSavedTitle: '',
@@ -185,6 +194,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     const documents = await listDocuments()
     set({ documents })
   },
+  clearRecentDocumentsForSignedOut: () => {
+    set({ recentDocuments: [], recentDocumentsState: 'signed-out' })
+  },
+  refreshRecentDocuments: async (uid) => {
+    if (!uid) {
+      set({ recentDocuments: [], recentDocumentsState: 'signed-out' })
+      return
+    }
+    set({ recentDocumentsState: 'loading' })
+    try {
+      const recentDocuments = await refreshRecentDocumentsForUser(uid)
+      const documents = await listDocuments()
+      set({ recentDocuments, documents, recentDocumentsState: 'ready' })
+    } catch (error) {
+      const recentDocuments = await refreshLocalRecentDocuments()
+      set({ recentDocuments, recentDocumentsState: 'error' })
+      throw error
+    }
+  },
   hydrateTheme: async () => {
     const persistedTheme = await getThemePreference()
     set({ theme: normalizeTheme(persistedTheme, get().theme) })
@@ -197,6 +225,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const persistedTheme = await getThemePreference()
     const theme = normalizeTheme(persistedTheme, doc.theme ?? get().theme)
     const documents = await listDocuments()
+    if (get().isHydrated) {
+      return
+    }
     set({
       activeDocId: doc.id,
       draftTitle: doc.title,

@@ -8,7 +8,8 @@ This document describes the current product behavior that should remain stable a
 2. The editor hydrates the active local document from IndexedDB, or creates the seeded markdown test document if none exists.
 3. Editing the title or markdown updates draft state and marks the document dirty.
 4. `Save` writes the current title, markdown, and theme to IndexedDB.
-5. Recent documents are listed from IndexedDB by `updatedAt` descending.
+5. Signed-out users see `Sign in to see your backed up documents` in Recent Documents.
+6. Signed-in users see Recent Documents from a merged local/private-cloud view by `updatedAt` descending.
 6. Recent document rows show local/Firebase source icons and relative updated times.
 7. Opening a different document clears any active share link and loads that local document into the editor.
 8. If there are unsaved changes, navigating away from the current document asks for confirmation.
@@ -23,7 +24,9 @@ Desktop users work in one of three app-state-owned view modes:
 
 The toolbar inserts markdown snippets into CodeMirror. Outline selections switch to split mode when needed, then scroll the editor and preview toward the selected heading.
 
-The desktop sidebar has `Documents` and `Outline` tabs. The document list shows up to six recent documents; the outline tab is generated from markdown headings.
+The desktop sidebar has `Outline` and `Documents` tabs. `Outline` is selected by default. The document list shows up to six recent documents; the outline tab is generated from markdown headings.
+
+The Documents tab exposes a delete action for each recent document. Deleting asks for confirmation, removes the local working copy, and opens a new draft if the deleted item was active.
 
 ## Mobile Authoring
 
@@ -60,7 +63,15 @@ Rendered Mermaid blocks also expose SVG and PNG download actions from the diagra
 
 Signed-out users can edit locally. They see sign-in actions in the desktop topbar, mobile topbar, and share dialog.
 
-Signed-in users see an avatar account button on desktop and mobile. Opening it shows identity details and a sign-out action. Choosing sign out shows inline confirmation. Cancel returns to the normal menu; Confirm signs out. Escape, outside pointer down, and auth loss close the menu and reset confirmation state.
+Signed-in users see an avatar account button on desktop and mobile. Opening it shows identity details and a sign-out action. Choosing sign out shows inline confirmation. Cancel returns to the normal menu; Confirm saves unsaved work first, then signs out and clears visible Recent Documents. If saving fails, sign-out is aborted. Escape, outside pointer down, and auth loss close the menu and reset confirmation state.
+
+## Backed Up Documents
+
+Signed-in Recent Documents are built from local IndexedDB documents and private Firestore documents at `users/{uid}/documents/{documentId}`.
+
+The sync layer matches local and cloud documents by `cloudDocumentId`. Cloud-only documents are hydrated into local working copies before opening. Newer local-only edits are backed up to the private cloud document. Newer cloud-only edits update the local working copy. If both sides changed after the last sync point, the item is marked as a conflict instead of silently overwriting either version.
+
+Deleting a backed-up document soft-deletes the private cloud document and removes the local working copy. Public share links in `sharedDocuments` are not deleted by this action.
 
 ## Sharing From The Editor
 

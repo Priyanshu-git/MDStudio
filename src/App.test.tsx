@@ -17,6 +17,13 @@ vi.mock('./storage/shareDocuments', () => ({
   updateSharedDocument: vi.fn(),
 }))
 
+vi.mock('./storage/documentSync', () => ({
+  backUpLocalDocument: vi.fn(async (_uid: string, doc: unknown) => doc),
+  deleteRecentDocument: vi.fn(),
+  refreshLocalRecentDocuments: vi.fn(async () => []),
+  refreshRecentDocumentsForUser: vi.fn(async () => []),
+}))
+
 vi.mock('./firebase/auth', () => ({
   listenToAuthState: vi.fn((callback: (user: unknown) => void) => {
     callback(authMockState.currentUser)
@@ -52,6 +59,8 @@ describe('App routing shell', () => {
       activeDocId: null,
       activeShareId: null,
       documents: [],
+      recentDocuments: [],
+      recentDocumentsState: 'signed-out',
       draftTitle: 'Markdown Rendering Test File',
       draftMarkdown: '# Markdown Rendering Test File\n\n## Core markdown features\n',
       lastLocalSavedTitle: 'Markdown Rendering Test File',
@@ -103,7 +112,7 @@ describe('App routing shell', () => {
     expect(screen.queryByRole('button', { name: 'Focus' })).not.toBeInTheDocument()
   })
 
-  it('switches desktop sidebar between documents and outline', () => {
+  it('defaults to outline and switches desktop sidebar to documents', () => {
     window.history.pushState({}, '', '/editor')
     const { container } = render(
       <BrowserRouter>
@@ -111,15 +120,18 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Recent Documents' })).toBeInTheDocument()
-    const outlineTab = container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(2)')
-    expect(outlineTab).not.toBeNull()
-
-    fireEvent.click(outlineTab as HTMLButtonElement)
-
-    expect(outlineTab).toHaveClass('active')
     expect(screen.queryByRole('heading', { name: 'Recent Documents' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Core markdown features/ })).toBeInTheDocument()
+    const outlineTab = container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(1)')
+    const documentsTab = container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(2)')
+    expect(outlineTab).toHaveClass('active')
+    expect(documentsTab).not.toBeNull()
+
+    fireEvent.click(documentsTab as HTMLButtonElement)
+
+    expect(documentsTab).toHaveClass('active')
+    expect(screen.getByRole('heading', { name: 'Recent Documents' })).toBeInTheDocument()
+    expect(screen.getByText('Sign in to see your backed up documents')).toBeInTheDocument()
   })
 
   it('shows recent document source icons and relative time on desktop', async () => {
@@ -133,8 +145,7 @@ describe('App routing shell', () => {
         createdAt: now - 2 * 24 * 60 * 60 * 1000,
         updatedAt: now - 2 * 24 * 60 * 60 * 1000,
         source: 'firebase',
-        sourceShareId: 'share-1',
-        sourceOwnerUid: 'user-1',
+        syncStatus: 'backed-up',
       },
       {
         id: 'local-doc',
@@ -143,14 +154,17 @@ describe('App routing shell', () => {
         createdAt: now - 5 * 60 * 1000,
         updatedAt: now - 5 * 60 * 1000,
         source: 'local',
+        syncStatus: 'local-only',
       },
-    ] as ReturnType<typeof useAppStore.getState>['documents']
+    ] as ReturnType<typeof useAppStore.getState>['recentDocuments']
 
     render(
       <DocumentList
         documents={documents}
+        recentDocumentsState="ready"
         activeDocId="local-doc"
         onOpen={vi.fn()}
+        onDelete={vi.fn()}
       />,
     )
 
@@ -158,10 +172,38 @@ describe('App routing shell', () => {
     expect(screen.getByText('5 mins ago')).toBeInTheDocument()
     expect(screen.getByText('2 days ago')).toBeInTheDocument()
     expect(screen.getAllByLabelText('Local document').length).toBeGreaterThan(0)
-    expect(screen.getAllByLabelText('Firebase document').length).toBeGreaterThan(0)
+    expect(screen.getAllByLabelText('Backed up document').length).toBeGreaterThan(0)
     expect(screen.queryByText(new Date(now - 5 * 60 * 1000).toLocaleDateString())).not.toBeInTheDocument()
 
     nowSpy.mockRestore()
+  })
+
+  it('exposes delete action for desktop recent documents', () => {
+    const onDelete = vi.fn()
+    const document = {
+      id: 'local-doc',
+      localDocumentId: 'local-doc',
+      title: 'Local Notes',
+      markdown: '# Local Notes',
+      createdAt: 1,
+      updatedAt: 2,
+      source: 'local',
+      syncStatus: 'local-only',
+    } as ReturnType<typeof useAppStore.getState>['recentDocuments'][number]
+
+    render(
+      <DocumentList
+        documents={[document]}
+        recentDocumentsState="ready"
+        activeDocId={null}
+        onOpen={vi.fn()}
+        onDelete={onDelete}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Local Notes' }))
+
+    expect(onDelete).toHaveBeenCalledWith(document)
   })
 
   it('shows recent document source icons and relative time on mobile files view', () => {
@@ -175,40 +217,40 @@ describe('App routing shell', () => {
         createdAt: now - 2 * 24 * 60 * 60 * 1000,
         updatedAt: now - 2 * 24 * 60 * 60 * 1000,
         source: 'firebase',
-        sourceShareId: 'share-1',
-        sourceOwnerUid: 'user-1',
+        syncStatus: 'backed-up',
       },
-    ] as ReturnType<typeof useAppStore.getState>['documents']
+    ] as ReturnType<typeof useAppStore.getState>['recentDocuments']
 
     render(
       <FilesView
         documents={documents}
+        recentDocumentsState="ready"
         activeDocId="firebase-doc"
         search=""
         onSearch={vi.fn()}
         onNew={vi.fn()}
         onImport={vi.fn()}
         onOpen={vi.fn()}
+        onDelete={vi.fn()}
       />,
     )
 
     expect(screen.getByText('Cloud Notes')).toBeInTheDocument()
     expect(screen.getByText('2 days ago · 1 KB')).toBeInTheDocument()
-    expect(screen.getByLabelText('Firebase document')).toBeInTheDocument()
+    expect(screen.getByLabelText('Backed up document')).toBeInTheDocument()
 
     nowSpy.mockRestore()
   })
 
   it('scrolls editor and preview when selecting an outline item from preview mode', async () => {
     window.history.pushState({}, '', '/editor')
-    const { container } = render(
+    render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0])
-    fireEvent.click(container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(2)')!)
     fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
 
     await waitFor(() => {
@@ -338,13 +380,12 @@ describe('App routing shell', () => {
 
   it('does not create ripples on outline rows', () => {
     window.history.pushState({}, '', '/editor')
-    const { container } = render(
+    render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
 
-    fireEvent.click(container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(2)')!)
     const outlineRow = screen.getByRole('button', { name: /Core markdown features/ })
 
     fireEvent.pointerDown(outlineRow, { button: 0, clientX: 24, clientY: 16 })

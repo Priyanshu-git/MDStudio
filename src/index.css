@@ -832,11 +832,45 @@ a {
 }
 
 .document-row {
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0;
+  overflow: hidden;
 }
 
 .outline-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.document-row-main {
+  min-width: 0;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 8px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.document-delete-button {
+  width: 34px;
+  height: 100%;
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.document-delete-button:hover {
+  color: var(--danger);
+  background: var(--hover-bg);
 }
 
 .document-row span,
@@ -1703,7 +1737,7 @@ select:focus-visible {
   .mobile-document-row {
     min-height: 76px;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
     align-items: center;
     border: 0;
@@ -1711,6 +1745,19 @@ select:focus-visible {
     padding: 12px;
     text-align: left;
     background: var(--surface);
+  }
+
+  .mobile-document-row-main {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    color: inherit;
+    background: transparent;
   }
 
   .mobile-document-row:hover,
@@ -1723,9 +1770,9 @@ select:focus-visible {
     height: 32px;
   }
 
-  .document-more-icon {
-    grid-column: 3;
-    color: var(--muted);
+  .document-delete-button.mobile {
+    width: 38px;
+    min-height: 52px;
   }
 
   .mobile-document-row .document-title {

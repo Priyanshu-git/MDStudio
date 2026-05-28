@@ -47,3 +47,9 @@
 - **Status:** Accepted
 - **Decision:** Signed-in users open an account menu from the avatar; sign-out requires inline confirmation and resets on Escape, outside click, or auth loss.
 - **Rationale:** Prevents accidental sign-out while keeping account controls available on both desktop and mobile.
+
+## ADR-009: Private Cloud Backup Separate From Public Sharing
+
+- **Status:** Accepted
+- **Decision:** Store signed-in users' backed-up editable documents in private `users/{uid}/documents/{documentId}` collections. Keep `sharedDocuments` only for public share links.
+- **Rationale:** Recent Documents and backup/sync need owner-private data semantics, while share links need public-read semantics. Keeping these stores separate prevents public sharing from becoming an accidental document library and leaves room for mature sync, conflict handling, and deletion behavior.

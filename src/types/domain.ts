@@ -17,8 +17,44 @@ export type Document = {
   source: DocumentSource
   sourceShareId?: string
   sourceOwnerUid?: string
+  cloudDocumentId?: string
+  cloudOwnerUid?: string
+  cloudUpdatedAt?: number
+  lastSyncedAt?: number
   theme?: ThemeName
 }
+
+export type CloudDocument = {
+  id: string
+  title: string
+  markdown: string
+  ownerUid: string
+  createdAt: number
+  updatedAt: number
+  localDocumentId?: string
+  deletedAt?: number
+}
+
+export type RecentDocumentSyncStatus =
+  | 'local-only'
+  | 'backed-up'
+  | 'syncing'
+  | 'conflict'
+  | 'error'
+
+export type RecentDocumentItem = {
+  id: string
+  title: string
+  markdown: string
+  createdAt: number
+  updatedAt: number
+  localDocumentId?: string
+  cloudDocumentId?: string
+  source: DocumentSource
+  syncStatus: RecentDocumentSyncStatus
+}
+
+export type RecentDocumentsState = 'signed-out' | 'loading' | 'ready' | 'error'
 
 export type SharedDocument = {
   id: string

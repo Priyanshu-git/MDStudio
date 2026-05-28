@@ -22,6 +22,8 @@ Google sign-in uses Firebase Auth with `signInWithPopup` and `prompt: select_acc
 
 - `/editor` continues to save editable documents locally in IndexedDB.
 - Unauthenticated users can edit locally but must sign in with Google to share.
+- Unauthenticated users can edit locally but must sign in with Google to see backed-up Recent Documents or share.
+- Signed-in users can back up editable documents to private owner-only user document collections.
 - Creating a share link writes a Firestore document in `sharedDocuments`.
 - After link creation, the local document is marked as Firebase-backed with `sourceShareId` and `sourceOwnerUid`.
 - The current share dialog shows the existing link and copy action for already-linked documents; it does not expose an update-link action.
@@ -33,7 +35,25 @@ Google sign-in uses Firebase Auth with `signInWithPopup` and `prompt: select_acc
 - Non-owner copies are new local documents and do not keep Firebase source metadata.
 - Theme is not stored in Firestore; shared pages use the app-level local theme preference.
 
-## Firestore Document Shape
+## Private Firestore Document Shape
+
+Collection path: `users/{uid}/documents/{documentId}`
+
+```json
+{
+  "title": "string",
+  "markdown": "string",
+  "ownerUid": "user uid",
+  "createdAt": 1710000000000,
+  "updatedAt": 1710000000000,
+  "localDocumentId": "optional local id",
+  "deletedAt": "optional timestamp"
+}
+```
+
+Only the authenticated owner can read or write these documents.
+
+## Shared Firestore Document Shape
 
 Collection: `sharedDocuments`
 
@@ -59,11 +79,28 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/documents/{docId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.ownerUid == userId;
+      allow update: if isOwner(userId)
+        && resource.data.ownerUid == userId
+        && request.resource.data.ownerUid == userId;
+    }
+
     match /sharedDocuments/{docId} {
       allow read: if true;
-      allow create: if request.auth != null
+      allow create: if isSignedIn()
         && request.resource.data.ownerUid == request.auth.uid;
-      allow update, delete: if request.auth != null
+      allow update, delete: if isSignedIn()
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid;
     }

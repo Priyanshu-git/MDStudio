@@ -11,6 +11,10 @@ export type CreateDocumentInput = {
   source?: DocumentSource
   sourceShareId?: string
   sourceOwnerUid?: string
+  cloudDocumentId?: string
+  cloudOwnerUid?: string
+  cloudUpdatedAt?: number
+  lastSyncedAt?: number
 }
 
 export type UpdateDocumentInput = {
@@ -20,6 +24,10 @@ export type UpdateDocumentInput = {
   source?: DocumentSource
   sourceShareId?: string
   sourceOwnerUid?: string
+  cloudDocumentId?: string
+  cloudOwnerUid?: string
+  cloudUpdatedAt?: number
+  lastSyncedAt?: number
 }
 
 const DEFAULT_TITLE = 'Untitled Document'
@@ -53,6 +61,10 @@ export async function createDocument(input: CreateDocumentInput | string): Promi
     source: payload.source ?? 'local',
     ...(payload.sourceShareId ? { sourceShareId: payload.sourceShareId } : {}),
     ...(payload.sourceOwnerUid ? { sourceOwnerUid: payload.sourceOwnerUid } : {}),
+    ...(payload.cloudDocumentId ? { cloudDocumentId: payload.cloudDocumentId } : {}),
+    ...(payload.cloudOwnerUid ? { cloudOwnerUid: payload.cloudOwnerUid } : {}),
+    ...(payload.cloudUpdatedAt ? { cloudUpdatedAt: payload.cloudUpdatedAt } : {}),
+    ...(payload.lastSyncedAt ? { lastSyncedAt: payload.lastSyncedAt } : {}),
     ...(payload.theme ? { theme: payload.theme } : {}),
   }
   await db.documents.put(doc)
@@ -70,12 +82,25 @@ export async function listDocuments(): Promise<Document[]> {
   return docs.map(normalizeDocument)
 }
 
+export async function findDocumentByCloudDocumentId(cloudDocumentId: string): Promise<Document | undefined> {
+  const doc = await db.documents.where('cloudDocumentId').equals(cloudDocumentId).first()
+  return doc ? normalizeDocument(doc) : undefined
+}
+
 export async function updateDocument(id: string, input: UpdateDocumentInput): Promise<void> {
   await db.documents.update(id, { ...input, updatedAt: Date.now() })
 }
 
 export async function updateDocumentMarkdown(id: string, markdown: string): Promise<void> {
   await updateDocument(id, { markdown })
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  await db.documents.delete(id)
+  const activeId = await getActiveDocumentId()
+  if (activeId === id) {
+    await db.appState.delete(ACTIVE_DOC_KEY)
+  }
 }
 
 export async function setActiveDocumentId(id: string): Promise<void> {

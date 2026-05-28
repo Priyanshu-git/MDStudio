@@ -27,6 +27,13 @@ vi.mock('../storage/shareDocuments', () => ({
   updateSharedDocument: vi.fn(),
 }))
 
+vi.mock('../storage/documentSync', () => ({
+  backUpLocalDocument: vi.fn(async (_uid: string, doc: unknown) => doc),
+  deleteRecentDocument: vi.fn(),
+  refreshLocalRecentDocuments: vi.fn(async () => []),
+  refreshRecentDocumentsForUser: vi.fn(async () => []),
+}))
+
 vi.mock('../firebase/auth', () => ({
   listenToAuthState: vi.fn((callback: (user: unknown) => void) => {
     callback(authMock.user)

@@ -6,7 +6,8 @@
 - No SSR pipeline.
 - Route-driven app shell with local-first editor state and Firestore-backed sharing.
 - Firebase Auth is used for Google sign-in and share ownership.
-- IndexedDB remains the canonical local document store.
+- IndexedDB remains the canonical local working document store.
+- Signed-in users can back up documents to private Firestore user document collections.
 - Vite owns build/test configuration, including PWA setup and workspace-local temp output.
 
 ## Route Contract
@@ -21,7 +22,7 @@
   - `write`: editor and insert toolbar
   - `preview`: read-only preview
   - `outline`: heading outline
-  - `files`: local document list, search, new document, and import
+  - `files`: recent document list, search, new document, and import
 - `/doc/:id` opens a local document and redirects to `/editor`
 - `/share/:id` loads a public shared document from Firestore in read-only mode
 - Unknown routes redirect to `/editor`
@@ -38,9 +39,13 @@
 
 ## Data Flow
 
-CodeMirror input -> app store draft state -> explicit local save -> Dexie -> markdown pipeline -> preview renderers.
+CodeMirror input -> app store draft state -> explicit local save -> Dexie -> optional private cloud backup -> markdown pipeline -> preview renderers.
 
-Sharing flow: signed-in user -> save local draft -> create Firestore `sharedDocuments` record -> mark the local document as `source: 'firebase'` with share metadata -> store active share snapshot in app state -> `/share/:id` reads public record.
+Private backup flow: signed-in user -> save local draft -> write `users/{uid}/documents/{documentId}` -> store cloud document metadata locally -> refresh sync-aware Recent Documents.
+
+Recent Documents flow: signed-out users see a sign-in prompt. Signed-in users see a merged view from IndexedDB and private Firestore user documents. The sync adapter matches documents by cloud document id, hydrates cloud-only documents into local working copies, pushes newer local changes, applies newer cloud changes, and marks dual edits as conflicts.
+
+Sharing flow: signed-in user -> save local draft -> create Firestore `sharedDocuments` record -> mark the local document with share metadata -> store active share snapshot in app state -> `/share/:id` reads public record.
 
 Owner shared-document flow: owner opens `/share/:id` -> reuse `sourceDocId` when present locally, or create a Firebase-sourced local document -> link active share state -> navigate to `/editor`.
 
@@ -52,7 +57,7 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 
 - `desktopViewMode: 'edit' | 'split' | 'preview'` is owned by app state.
 - `mobileTab: 'write' | 'preview' | 'outline' | 'files'` is owned by app state.
-- `desktopSidebarTab: 'documents' | 'outline'` is local editor-shell UI state.
+- `desktopSidebarTab: 'documents' | 'outline'` is local editor-shell UI state and defaults to `outline`.
 - The desktop editor theme picker is a custom grouped menu with light and dark theme sections; Escape and outside pointer down close it.
 - `/share/:id` uses direct topbar actions on desktop and a compact menu on mobile.
 - Editor and shared mobile app bars auto-hide on downward scroll and reappear on upward scroll.
@@ -64,6 +69,7 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 - Signed-in users see an avatar/account button on desktop and mobile.
 - Opening the account menu shows display name/email and a sign-out action.
 - Sign-out requires inline confirmation; Escape, outside pointer down, or auth loss closes and resets the menu.
+- Confirmed sign-out first saves unsaved work. If saving fails, sign-out is aborted. After successful sign-out, Recent Documents is cleared from view and replaced by the signed-out prompt.
 
 ## Persistence Schema
 
@@ -71,7 +77,8 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 - `documents` table version 3 indexes: `id`, `updatedAt`, `createdAt`, `title`, `source`, `sourceShareId`, `sourceOwnerUid`.
 - `appState` table stores string values by `key`; currently `activeDocId` and `theme`.
 - Document theme is saved with local documents, while the app-level theme preference is saved separately.
-- Firestore `sharedDocuments` are published copies and do not persist theme.
+- Firestore `users/{uid}/documents/{documentId}` stores private owner-only backups.
+- Firestore `sharedDocuments` are public published copies and do not persist theme.
 
 ## Interaction Effects
 

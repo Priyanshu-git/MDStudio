@@ -24,6 +24,10 @@ class MarkdownStudioDb extends Dexie {
       documents: 'id,updatedAt,createdAt,title,source,sourceShareId,sourceOwnerUid',
       appState: 'key',
     })
+    this.version(4).stores({
+      documents: 'id,updatedAt,createdAt,title,source,sourceShareId,sourceOwnerUid,cloudDocumentId,cloudOwnerUid',
+      appState: 'key',
+    })
   }
 }
 

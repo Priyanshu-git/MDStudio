@@ -16,8 +16,9 @@
    - Heavy renderers such as Mermaid and Shiki should remain lazy-loaded unless there is a measured reason to change that.
 
 4. **Data Source of Truth**
-   - IndexedDB is the canonical editable document store.
-   - Firestore is a published share copy, not the source of truth for editor drafts.
+   - IndexedDB is the canonical editable working document store.
+   - Private Firestore user documents are backup/sync copies, not the live editor authority.
+   - Public `sharedDocuments` are published share copies, not private backups.
    - No alternate persistent source may become authoritative without ADR + docs update.
 
 5. **Change Protocol**

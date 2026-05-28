@@ -25,7 +25,6 @@ import {
   LogIn,
   LogOut,
   Minus,
-  MoreVertical,
   Plus,
   Quote,
   Redo2,
@@ -34,19 +33,21 @@ import {
   Share2,
   Sigma,
   Table,
+  Trash2,
   Undo2,
   Upload,
   UserCircle,
 } from 'lucide-react'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
-import { updateDocument } from '../storage/documents'
+import { getDocumentById, updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
 import { useAutoHideAppbar } from '../hooks/useAutoHideAppbar'
 import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle } from './MarkdownEditor'
-import type { DesktopViewMode, MobileTab, SaveStatus, ThemeName } from '../types'
+import type { DesktopViewMode, MobileTab, RecentDocumentItem, RecentDocumentsState, SaveStatus, ThemeName } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
+import { backUpLocalDocument, deleteRecentDocument } from '../storage/documentSync'
 
 type OutlineItem = {
   id: string
@@ -252,12 +253,13 @@ export function EditorShellPage() {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [fileSearch, setFileSearch] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
-  const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('documents')
+  const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('outline')
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
 
   const activeDocId = useAppStore((state) => state.activeDocId)
   const activeShareId = useAppStore((state) => state.activeShareId)
-  const documents = useAppStore((state) => state.documents)
+  const recentDocuments = useAppStore((state) => state.recentDocuments)
+  const recentDocumentsState = useAppStore((state) => state.recentDocumentsState)
   const draftTitle = useAppStore((state) => state.draftTitle)
   const draftMarkdown = useAppStore((state) => state.draftMarkdown)
   const lastLocalSavedMarkdown = useAppStore((state) => state.lastLocalSavedMarkdown)
@@ -268,6 +270,8 @@ export function EditorShellPage() {
   const saveError = useAppStore((state) => state.saveError)
   const hydrateDocument = useAppStore((state) => state.hydrateDocument)
   const refreshDocuments = useAppStore((state) => state.refreshDocuments)
+  const refreshRecentDocuments = useAppStore((state) => state.refreshRecentDocuments)
+  const clearRecentDocumentsForSignedOut = useAppStore((state) => state.clearRecentDocumentsForSignedOut)
   const setDraftTitle = useAppStore((state) => state.setDraftTitle)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
   const setTheme = useAppStore((state) => state.setTheme)
@@ -286,10 +290,10 @@ export function EditorShellPage() {
   const words = useMemo(() => countWords(draftMarkdown), [draftMarkdown])
   const filteredDocuments = useMemo(
     () =>
-      documents.filter((doc) =>
+      recentDocuments.filter((doc) =>
         doc.title.toLowerCase().includes(fileSearch.trim().toLowerCase()),
       ),
-    [documents, fileSearch],
+    [recentDocuments, fileSearch],
   )
   const markdownOk = saveStatus === 'error' ? 'Check errors' : 'Markdown OK'
   const isMobileViewport = useIsMobileViewport()
@@ -325,8 +329,13 @@ export function EditorShellPage() {
     if (!nextUser) {
       setIsProfileMenuOpen(false)
       setIsConfirmingSignOut(false)
+      clearRecentDocumentsForSignedOut()
+      return
     }
-  }), [])
+    void refreshRecentDocuments(nextUser.uid).catch(() => {
+      setAuthError('Unable to load backed up documents.')
+    })
+  }), [clearRecentDocumentsForSignedOut, refreshRecentDocuments])
 
   useEffect(() => {
     if (!isProfileMenuOpen) {
@@ -467,6 +476,28 @@ export function EditorShellPage() {
     await openDocument(docId)
   }
 
+  async function handleDeleteRecentDocument(item: RecentDocumentItem) {
+    if (!window.confirm(`Delete "${item.title}" from Documents?`)) {
+      return
+    }
+
+    setAuthError(null)
+    try {
+      await deleteRecentDocument(user?.uid ?? null, item)
+      if (item.localDocumentId === activeDocId) {
+        createNewDraft()
+      }
+      await refreshDocuments()
+      if (user) {
+        await refreshRecentDocuments(user.uid)
+      } else {
+        clearRecentDocumentsForSignedOut()
+      }
+    } catch {
+      setAuthError('Unable to delete document right now.')
+    }
+  }
+
   function handleInsert(action: MarkdownInsertAction) {
     setIsInsertOpen(false)
     setMobileTab('write')
@@ -543,7 +574,11 @@ export function EditorShellPage() {
   }
 
   async function handleSave() {
-    await saveDraft()
+    const doc = await saveDraft()
+    if (user) {
+      await backUpLocalDocument(user.uid, doc)
+      await refreshRecentDocuments(user.uid)
+    }
   }
 
   async function handleSharePublish() {
@@ -569,7 +604,9 @@ export function EditorShellPage() {
           sourceShareId: activeShareId,
           sourceOwnerUid: user.uid,
         })
+        await backUpLocalDocument(user.uid, (await getDocumentById(doc.id)) ?? doc)
         await refreshDocuments()
+        await refreshRecentDocuments(user.uid)
         setLastCloudSavedSnapshot(draftTitle, draftMarkdown)
       } else {
         const result = await publishSharedDocument({
@@ -583,7 +620,9 @@ export function EditorShellPage() {
           sourceShareId: result.shareId,
           sourceOwnerUid: user.uid,
         })
+        await backUpLocalDocument(user.uid, (await getDocumentById(doc.id)) ?? doc)
         await refreshDocuments()
+        await refreshRecentDocuments(user.uid)
         linkActiveShare(result.shareId, draftTitle, draftMarkdown)
       }
     } catch {
@@ -609,7 +648,9 @@ export function EditorShellPage() {
   async function handleSignIn() {
     setAuthError(null)
     try {
-      await signInWithGoogle()
+      const signedInUser = await signInWithGoogle()
+      setUser(signedInUser)
+      await refreshRecentDocuments(signedInUser.uid)
     } catch {
       setAuthError('Unable to sign in with Google.')
     }
@@ -631,7 +672,14 @@ export function EditorShellPage() {
   async function handleSignOut(): Promise<boolean> {
     setAuthError(null)
     try {
+      if (hasUnsavedChanges()) {
+        const doc = await saveDraft()
+        if (user) {
+          await backUpLocalDocument(user.uid, doc)
+        }
+      }
       await signOutCurrentUser()
+      clearRecentDocumentsForSignedOut()
       return true
     } catch {
       setAuthError('Unable to sign out right now.')
@@ -836,19 +884,19 @@ export function EditorShellPage() {
             <div className="sidebar-tabs">
               <button
                 type="button"
-                className={desktopSidebarTab === 'documents' ? 'sidebar-tab active' : 'sidebar-tab'}
-                onClick={() => setDesktopSidebarTab('documents')}
-              >
-                <FileText size={16} />
-                Documents
-              </button>
-              <button
-                type="button"
                 className={desktopSidebarTab === 'outline' ? 'sidebar-tab active' : 'sidebar-tab'}
                 onClick={() => setDesktopSidebarTab('outline')}
               >
                 <BookOpen size={16} />
                 Outline
+              </button>
+              <button
+                type="button"
+                className={desktopSidebarTab === 'documents' ? 'sidebar-tab active' : 'sidebar-tab'}
+                onClick={() => setDesktopSidebarTab('documents')}
+              >
+                <FileText size={16} />
+                Documents
               </button>
             </div>
             {desktopSidebarTab === 'documents' ? (
@@ -864,8 +912,10 @@ export function EditorShellPage() {
                 </div>
                 <DocumentList
                   documents={filteredDocuments}
+                  recentDocumentsState={recentDocumentsState}
                   activeDocId={activeDocId}
                   onOpen={(id) => void guardedOpenDocument(id)}
+                  onDelete={(item) => void handleDeleteRecentDocument(item)}
                 />
               </>
             ) : (
@@ -909,12 +959,14 @@ export function EditorShellPage() {
           {isMobileViewport && mobileTab === 'files' ? (
             <FilesView
               documents={filteredDocuments}
+              recentDocumentsState={recentDocumentsState}
               activeDocId={activeDocId}
               search={fileSearch}
               onSearch={setFileSearch}
               onNew={createNewDraft}
               onImport={handleImportClick}
               onOpen={(id) => void guardedOpenDocument(id)}
+              onDelete={(item) => void handleDeleteRecentDocument(item)}
             />
           ) : null}
         </section>
@@ -1203,35 +1255,51 @@ function EditorToolbar({
 
 export function DocumentList({
   documents,
+  recentDocumentsState,
   activeDocId,
   onOpen,
+  onDelete,
 }: {
-  documents: ReturnType<typeof useAppStore.getState>['documents']
+  documents: RecentDocumentItem[]
+  recentDocumentsState: RecentDocumentsState
   activeDocId: string | null
   onOpen: (id: string) => void
+  onDelete: (item: RecentDocumentItem) => void
 }) {
+  if (recentDocumentsState === 'signed-out') {
+    return (
+      <section className="sidebar-section">
+        <h2>Recent Documents</h2>
+        <p className="muted-text">Sign in to see your backed up documents</p>
+      </section>
+    )
+  }
+
   return (
     <section className="sidebar-section">
       <h2>Recent Documents</h2>
       <div className="document-list">
         {documents.slice(0, 6).map((doc) => {
-          const SourceIcon = doc.source === 'firebase' ? Cloud : HardDrive
-          const sourceLabel = doc.source === 'firebase' ? 'Firebase document' : 'Local document'
+          const SourceIcon = doc.syncStatus === 'backed-up' ? Cloud : HardDrive
+          const sourceLabel = doc.syncStatus === 'backed-up' ? 'Backed up document' : 'Local document'
           return (
-            <button
+            <div
               key={doc.id}
-              type="button"
               className={doc.id === activeDocId ? 'document-row active' : 'document-row'}
-              onClick={() => onOpen(doc.id)}
             >
-              <span className="document-source-icon" role="img" aria-label={sourceLabel} title={sourceLabel}>
-                <SourceIcon size={17} aria-hidden="true" />
-              </span>
-              <span className="document-row-copy">
-                <span className="document-title">{doc.title}</span>
-                <small>{formatRelativeTime(doc.updatedAt)}</small>
-              </span>
-            </button>
+              <button type="button" className="document-row-main" onClick={() => onOpen(doc.id)}>
+                <span className="document-source-icon" role="img" aria-label={sourceLabel} title={sourceLabel}>
+                  <SourceIcon size={17} aria-hidden="true" />
+                </span>
+                <span className="document-row-copy">
+                  <span className="document-title">{doc.title}</span>
+                  <small>{formatRelativeTime(doc.updatedAt)}</small>
+                </span>
+              </button>
+              <button type="button" className="document-delete-button" onClick={() => onDelete(doc)} aria-label={`Delete ${doc.title}`} title="Delete">
+                <Trash2 size={15} />
+              </button>
+            </div>
           )
         })}
       </div>
@@ -1274,20 +1342,24 @@ function Outline({
 
 export function FilesView({
   documents,
+  recentDocumentsState,
   activeDocId,
   search,
   onSearch,
   onNew,
   onImport,
   onOpen,
+  onDelete,
 }: {
-  documents: ReturnType<typeof useAppStore.getState>['documents']
+  documents: RecentDocumentItem[]
+  recentDocumentsState: RecentDocumentsState
   activeDocId: string | null
   search: string
   onSearch: (value: string) => void
   onNew: () => void
   onImport: () => void
   onOpen: (id: string) => void
+  onDelete: (item: RecentDocumentItem) => void
 }) {
   return (
     <div className="files-view">
@@ -1307,17 +1379,19 @@ export function FilesView({
         <h2>Recent Documents</h2>
         <button type="button">View all</button>
       </div>
+      {recentDocumentsState === 'signed-out' ? (
+        <p className="muted-text">Sign in to see your backed up documents</p>
+      ) : (
       <section className="mobile-document-list">
         {documents.map((doc) => {
-          const SourceIcon = doc.source === 'firebase' ? Cloud : HardDrive
-          const sourceLabel = doc.source === 'firebase' ? 'Firebase document' : 'Local document'
+          const SourceIcon = doc.syncStatus === 'backed-up' ? Cloud : HardDrive
+          const sourceLabel = doc.syncStatus === 'backed-up' ? 'Backed up document' : 'Local document'
           return (
-            <button
+            <div
               key={doc.id}
-              type="button"
               className={doc.id === activeDocId ? 'mobile-document-row active' : 'mobile-document-row'}
-              onClick={() => onOpen(doc.id)}
             >
+              <button type="button" className="mobile-document-row-main" onClick={() => onOpen(doc.id)}>
               <span className="document-source-icon mobile" role="img" aria-label={sourceLabel} title={sourceLabel}>
                 <SourceIcon size={26} aria-hidden="true" />
               </span>
@@ -1327,11 +1401,15 @@ export function FilesView({
                   {formatRelativeTime(doc.updatedAt)} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB
                 </small>
               </span>
-              <MoreVertical className="document-more-icon" size={18} />
-            </button>
+              </button>
+              <button type="button" className="document-delete-button mobile" onClick={() => onDelete(doc)} aria-label={`Delete ${doc.title}`} title="Delete">
+                <Trash2 size={18} />
+              </button>
+            </div>
           )
         })}
       </section>
+      )}
       <div className="info-callout">
         <strong>Import supports .md files only.</strong>
         <span>Images must be added by URL.</span>
