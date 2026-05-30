@@ -23,7 +23,7 @@ Desktop users work in one of three app-state-owned view modes:
 - `split`: editor and preview
 - `preview`: preview only
 
-The toolbar inserts markdown snippets into CodeMirror. Outline selections switch to split mode when needed, then scroll the editor and preview toward the selected heading.
+The toolbar inserts markdown snippets into CodeMirror. Outline selections preserve the current view mode and scroll the visible editor or preview surface toward the selected heading.
 
 The desktop sidebar has `Outline` and `Documents` tabs. `Outline` is selected by default. The document list shows up to six recent documents; the outline tab is generated from markdown headings.
 

@@ -616,16 +616,22 @@ export function EditorShellPage() {
   }
 
   function handleOutlineSelect(item: OutlineItem) {
+    const shouldScrollPreview = !isMobileViewport && showPreview
+    const shouldScrollEditor = isMobileViewport ? mobileTab === 'outline' : showEditor
+
     if (mobileTab === 'outline') {
       setMobileTab('write')
     }
-    if (desktopViewMode !== 'split') {
-      setDesktopViewMode('split')
+    if (shouldScrollPreview) {
+      pendingPreviewLineRef.current = item.line
     }
-    pendingPreviewLineRef.current = item.line
     requestAnimationFrame(() => {
-      editorRef.current?.scrollToLine(item.line)
-      scrollPreviewToLine(item.line)
+      if (shouldScrollEditor) {
+        editorRef.current?.scrollToLine(item.line)
+      }
+      if (shouldScrollPreview) {
+        scrollPreviewToLine(item.line)
+      }
     })
   }
 

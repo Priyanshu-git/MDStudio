@@ -400,7 +400,7 @@ describe('App routing shell', () => {
 
   })
 
-  it('scrolls editor and preview when selecting an outline item from preview mode', async () => {
+  it('keeps preview mode active when selecting an outline item from preview mode', async () => {
     window.history.pushState({}, '', '/editor')
     render(
       <BrowserRouter>
@@ -412,8 +412,41 @@ describe('App routing shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
 
     await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Preview' })[0]).toHaveClass('active')
+      expect(HTMLElement.prototype.scrollTo).toHaveBeenCalled()
+    })
+  })
+
+  it('keeps split mode active when selecting an outline item from split mode', async () => {
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
+
+    await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Split' })).toHaveClass('active')
       expect(HTMLElement.prototype.scrollTo).toHaveBeenCalled()
+    })
+  })
+
+  it('keeps edit mode active when selecting an outline item from edit mode', async () => {
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+    fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Edit' })[0]).toHaveClass('active')
+      expect(HTMLElement.prototype.scrollTo).not.toHaveBeenCalled()
     })
   })
 
