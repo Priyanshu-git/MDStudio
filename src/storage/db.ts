@@ -28,6 +28,14 @@ class MarkdownStudioDb extends Dexie {
       documents: 'id,updatedAt,createdAt,title,source,sourceShareId,sourceOwnerUid,cloudDocumentId,cloudOwnerUid',
       appState: 'key',
     })
+    this.version(5).stores({
+      documents: 'id,updatedAt,contentUpdatedAt,createdAt,title,source,sourceShareId,sourceOwnerUid,cloudDocumentId,cloudOwnerUid',
+      appState: 'key',
+    }).upgrade(async (transaction) => {
+      await transaction.table<Document, string>('documents').toCollection().modify((doc) => {
+        doc.contentUpdatedAt = doc.contentUpdatedAt ?? doc.updatedAt
+      })
+    })
   }
 }
 

@@ -11,6 +11,8 @@ type Document = {
   markdown: string;
   createdAt: number;
   updatedAt: number;
+  contentUpdatedAt?: number;
+  syncUpdatedAt?: number;
   source: "local" | "firebase";
   sourceShareId?: string;
   sourceOwnerUid?: string;
@@ -50,6 +52,7 @@ type RecentDocumentItem = {
   markdown: string;
   createdAt: number;
   updatedAt: number;
+  contentUpdatedAt?: number;
   localDocumentId?: string;
   cloudDocumentId?: string;
   source: "local" | "firebase";
@@ -125,12 +128,14 @@ type SaveStatus =
 - `id` is unique across local documents.
 - `title` is required; imported files derive it from the filename, and new documents default to `Untitled Document`.
 - `updatedAt >= createdAt`.
+- `contentUpdatedAt` tracks user-visible content recency for title, markdown, and theme changes. When absent on older local records, readers fall back to `updatedAt`.
+- `syncUpdatedAt` tracks local sync metadata writes only and must not affect Recent Documents ordering or dirty-state checks.
 - `source` defaults to `local`; `firebase` is used after a document is published to Firestore or opened from an owned shared link.
 - `sourceShareId` is present when a local document represents a Firebase-backed document.
 - `sourceOwnerUid` is present when the owner is known locally.
 - `cloudDocumentId` links a local working copy to a private user backup document.
 - `cloudOwnerUid` must match the signed-in user that owns the private backup.
-- `lastSyncedAt` tracks the latest known clean local/cloud sync point for conflict detection.
+- `lastSyncedAt` tracks the latest known clean local/cloud content sync point for conflict detection.
 - `theme` is optional at document level and may fall back to app-level theme.
 - `SharedDocument.ownerUid` is required and must match the authenticated creator in Firestore rules.
 - `sourceDocId` links a share to the local document that produced it when available.
@@ -141,5 +146,6 @@ type SaveStatus =
 ## IndexedDB Shape
 
 - Database: `markdownStudioDb`.
-- `documents` table stores `Document` records and currently indexes `id`, `updatedAt`, `createdAt`, `title`, `source`, `sourceShareId`, `sourceOwnerUid`, `cloudDocumentId`, and `cloudOwnerUid`.
+- `documents` table stores `Document` records and currently indexes `id`, `updatedAt`, `contentUpdatedAt`, `createdAt`, `title`, `source`, `sourceShareId`, `sourceOwnerUid`, `cloudDocumentId`, and `cloudOwnerUid`.
+- IndexedDB version 5 initializes `contentUpdatedAt` from legacy `updatedAt` for existing records without changing document content or Firestore records.
 - `appState` stores `{ key: string, value: string }` entries for `activeDocId` and `theme`.

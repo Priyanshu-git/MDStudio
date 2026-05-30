@@ -105,6 +105,7 @@ type AppState = {
   refreshDocuments: () => Promise<void>
   clearRecentDocumentsForSignedOut: () => void
   refreshRecentDocuments: (uid?: string | null) => Promise<void>
+  refreshLocalRecentDocuments: () => Promise<void>
   hydrateTheme: () => Promise<void>
   hydrateDocument: () => Promise<void>
   createNewDraft: () => void
@@ -212,6 +213,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ recentDocuments, recentDocumentsState: 'error' })
       throw error
     }
+  },
+  refreshLocalRecentDocuments: async () => {
+    const [recentDocuments, documents] = await Promise.all([
+      refreshLocalRecentDocuments(),
+      listDocuments(),
+    ])
+    set({ recentDocuments, documents, recentDocumentsState: 'ready' })
   },
   hydrateTheme: async () => {
     const persistedTheme = await getThemePreference()

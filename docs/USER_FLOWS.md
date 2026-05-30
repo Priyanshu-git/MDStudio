@@ -9,10 +9,11 @@ This document describes the current product behavior that should remain stable a
 3. Editing the title or markdown updates draft state and marks the document dirty.
 4. `Save` writes the current title, markdown, and theme to IndexedDB.
 5. Signed-out users see `Sign in to see your backed up documents` in Recent Documents.
-6. Signed-in users see Recent Documents from a merged local/private-cloud view by `updatedAt` descending.
-6. Recent document rows show local/Firebase source icons and relative updated times.
-7. Opening a different document clears any active share link and loads that local document into the editor.
-8. If there are unsaved changes, navigating away from the current document asks for confirmation.
+6. Signed-in users see Recent Documents from a merged local/private-cloud view by content recency descending.
+7. Recent document rows show local/Firebase source icons and relative updated times.
+8. Relative updated times refresh in the UI about once per minute, so `just now` advances to `1 min ago`, `2 mins ago`, and later units without requiring a document refresh.
+9. Opening a different document clears any active share link and loads that local document into the editor.
+10. If there are unsaved changes, opening another document, creating a new document, or importing a document asks whether to save, save locally, discard, or cancel.
 
 ## Desktop Authoring
 
@@ -69,7 +70,7 @@ Signed-in users see an avatar account button on desktop and mobile. Opening it s
 
 Signed-in Recent Documents are built from local IndexedDB documents and private Firestore documents at `users/{uid}/documents/{documentId}`.
 
-The sync layer matches local and cloud documents by `cloudDocumentId`. Cloud-only documents are hydrated into local working copies before opening. Newer local-only edits are backed up to the private cloud document. Newer cloud-only edits update the local working copy. If both sides changed after the last sync point, the item is marked as a conflict instead of silently overwriting either version.
+The sync layer matches local and cloud documents by `cloudDocumentId`. Cloud-only documents are hydrated into local working copies before opening. Saving backs up only the active saved document. Newer cloud-only edits update the local working copy. If both sides changed after the last sync point, the item is marked as a conflict instead of silently overwriting either version. Metadata-only sync updates and relative-time UI refreshes do not make unrelated documents appear recently edited.
 
 Deleting a backed-up document soft-deletes the private cloud document and removes the local working copy. Public share links in `sharedDocuments` are not deleted by this action.
 

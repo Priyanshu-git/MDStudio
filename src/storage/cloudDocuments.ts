@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../firebase/client'
 import type { CloudDocument, Document } from '../types'
+import { documentContentTimestamp } from './documents'
 
 const USERS_COLLECTION = 'users'
 const DOCUMENTS_COLLECTION = 'documents'
@@ -47,12 +48,13 @@ export async function upsertCloudDocumentFromLocal(uid: string, localDocument: D
   const cloudDocumentId = localDocument.cloudDocumentId || localDocument.id
   const now = Date.now()
   const createdAt = localDocument.createdAt || now
+  const contentUpdatedAt = documentContentTimestamp(localDocument) || now
   const payload: CloudDocumentPayload = {
     title: localDocument.title,
     markdown: localDocument.markdown,
     ownerUid: uid,
     createdAt,
-    updatedAt: localDocument.updatedAt || now,
+    updatedAt: contentUpdatedAt,
     localDocumentId: localDocument.id,
   }
 
@@ -66,4 +68,3 @@ export async function softDeleteCloudDocument(uid: string, cloudDocumentId: stri
     updatedAt: Date.now(),
   })
 }
-

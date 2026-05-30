@@ -41,9 +41,11 @@
 
 CodeMirror input -> app store draft state -> explicit local save -> Dexie -> optional private cloud backup -> markdown pipeline -> preview renderers.
 
-Private backup flow: signed-in user -> save local draft -> write `users/{uid}/documents/{documentId}` -> store cloud document metadata locally -> refresh sync-aware Recent Documents.
+Private backup flow: signed-in user -> save local draft -> write only that document to `users/{uid}/documents/{documentId}` -> store cloud document metadata locally without changing content recency -> refresh Recent Documents from local records.
 
-Recent Documents flow: signed-out users see a sign-in prompt. Signed-in users see a merged view from IndexedDB and private Firestore user documents. The sync adapter matches documents by cloud document id, hydrates cloud-only documents into local working copies, pushes newer local changes, applies newer cloud changes, and marks dual edits as conflicts.
+Recent Documents flow: signed-out users see a sign-in prompt. Signed-in users see a merged view from IndexedDB and private Firestore user documents. The sync adapter matches documents by cloud document id, hydrates cloud-only documents into local working copies, applies genuinely newer cloud content, and marks dual edits as conflicts. No-op sync metadata refreshes do not change content recency.
+
+Recent Documents relative-time labels are UI-only. The editor shell keeps a minute-boundary timer for rendering labels such as `just now` and `1 min ago`; this timer must not refresh documents, reconcile sync state, write IndexedDB, or call Firestore.
 
 Sharing flow: signed-in user -> save local draft -> create Firestore `sharedDocuments` record -> mark the local document with share metadata -> store active share snapshot in app state -> `/share/:id` reads public record.
 
@@ -58,6 +60,7 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 - `desktopViewMode: 'edit' | 'split' | 'preview'` is owned by app state.
 - `mobileTab: 'write' | 'preview' | 'outline' | 'files'` is owned by app state.
 - `desktopSidebarTab: 'documents' | 'outline'` is local editor-shell UI state and defaults to `outline`.
+- Recent Documents relative-time rendering uses local editor-shell timer state and is not persisted.
 - The desktop editor theme picker is a custom grouped menu with light and dark theme sections; Escape and outside pointer down close it.
 - `/share/:id` uses direct topbar actions on desktop and a compact menu on mobile.
 - Editor and shared mobile app bars auto-hide on downward scroll and reappear on upward scroll.
@@ -74,7 +77,8 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 ## Persistence Schema
 
 - Dexie database name: `markdownStudioDb`.
-- `documents` table version 3 indexes: `id`, `updatedAt`, `createdAt`, `title`, `source`, `sourceShareId`, `sourceOwnerUid`.
+- `documents` table version 5 indexes: `id`, `updatedAt`, `contentUpdatedAt`, `createdAt`, `title`, `source`, `sourceShareId`, `sourceOwnerUid`, `cloudDocumentId`, and `cloudOwnerUid`.
+- `updatedAt` remains a legacy/content recency field for compatibility. `contentUpdatedAt` is the preferred Recent Documents timestamp, with fallback to `updatedAt` for older records. `syncUpdatedAt` records metadata-only sync touches and is not used for recency.
 - `appState` table stores string values by `key`; currently `activeDocId` and `theme`.
 - Document theme is saved with local documents, while the app-level theme preference is saved separately.
 - Firestore `users/{uid}/documents/{documentId}` stores private owner-only backups.

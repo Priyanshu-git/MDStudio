@@ -4,6 +4,7 @@ import {
   createDocument,
   getDocumentById,
   updateDocumentMarkdown,
+  updateDocumentSyncMetadata,
   getActiveDocumentId,
   setActiveDocumentId,
 } from './documents'
@@ -30,6 +31,27 @@ describe('Storage Layer', () => {
     const retrieved = await getDocumentById(doc.id)
     expect(retrieved?.markdown).toBe('# Updated')
     expect(retrieved?.updatedAt).toBeGreaterThan(doc.updatedAt)
+    expect(retrieved?.contentUpdatedAt).toBe(retrieved?.updatedAt)
+  })
+
+  it('preserves content recency for sync metadata updates', async () => {
+    const doc = await createDocument({ title: 'Synced', markdown: '# Synced' })
+
+    await updateDocumentSyncMetadata(doc.id, {
+      source: 'firebase',
+      cloudDocumentId: 'cloud-1',
+      cloudOwnerUid: 'user-1',
+      cloudUpdatedAt: doc.updatedAt,
+      lastSyncedAt: doc.updatedAt,
+    })
+
+    const retrieved = await getDocumentById(doc.id)
+    expect(retrieved).toEqual(expect.objectContaining({
+      updatedAt: doc.updatedAt,
+      contentUpdatedAt: doc.contentUpdatedAt,
+      cloudDocumentId: 'cloud-1',
+    }))
+    expect(retrieved?.syncUpdatedAt).toEqual(expect.any(Number))
   })
 
   it('manages active document ID', async () => {

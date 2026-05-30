@@ -48,6 +48,7 @@ import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle
 import type { DesktopViewMode, MobileTab, RecentDocumentItem, RecentDocumentsState, SaveStatus, ThemeName } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
 import { backUpLocalDocument, deleteRecentDocument } from '../storage/documentSync'
+import { useRelativeTimeNow } from './useRelativeTimeNow'
 
 type OutlineItem = {
   id: string
@@ -69,6 +70,10 @@ type LinkDialogState = {
   text: string
   url: string
   selection: EditorSelectionSnapshot | null
+}
+
+type PendingDraftTransition = {
+  action: () => void | Promise<void>
 }
 
 type ThemeOption = {
@@ -260,6 +265,8 @@ export function EditorShellPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('outline')
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
+  const [pendingDraftTransition, setPendingDraftTransition] = useState<PendingDraftTransition | null>(null)
+  const [isResolvingDraftTransition, setIsResolvingDraftTransition] = useState(false)
 
   const activeDocId = useAppStore((state) => state.activeDocId)
   const activeShareId = useAppStore((state) => state.activeShareId)
@@ -276,6 +283,7 @@ export function EditorShellPage() {
   const hydrateDocument = useAppStore((state) => state.hydrateDocument)
   const refreshDocuments = useAppStore((state) => state.refreshDocuments)
   const refreshRecentDocuments = useAppStore((state) => state.refreshRecentDocuments)
+  const refreshLocalRecentDocuments = useAppStore((state) => state.refreshLocalRecentDocuments)
   const clearRecentDocumentsForSignedOut = useAppStore((state) => state.clearRecentDocumentsForSignedOut)
   const setDraftTitle = useAppStore((state) => state.setDraftTitle)
   const setDraftMarkdown = useAppStore((state) => state.setDraftMarkdown)
@@ -302,6 +310,7 @@ export function EditorShellPage() {
   )
   const markdownOk = saveStatus === 'error' ? 'Check errors' : 'Markdown OK'
   const isMobileViewport = useIsMobileViewport()
+  const relativeTimeNow = useRelativeTimeNow()
   const showSidebar = true
   const showEditor = desktopViewMode === 'edit' || desktopViewMode === 'split'
   const showPreview = desktopViewMode === 'preview' || desktopViewMode === 'split'
@@ -478,11 +487,65 @@ export function EditorShellPage() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isLinkDialogOpen])
 
-  async function guardedOpenDocument(docId: string) {
-    if (hasUnsavedChanges() && !window.confirm('You have unsaved changes. Save before leaving?')) {
+  function runGuardedDraftTransition(action: () => void | Promise<void>) {
+    if (!hasUnsavedChanges()) {
+      void action()
       return
     }
-    await openDocument(docId)
+    setPendingDraftTransition({ action })
+  }
+
+  async function saveCurrentDraft(backupToCloud: boolean) {
+    const doc = await saveDraft()
+    if (backupToCloud && user) {
+      await backUpLocalDocument(user.uid, doc)
+    }
+    if (user) {
+      await refreshLocalRecentDocuments()
+    } else {
+      await refreshDocuments()
+    }
+    return doc
+  }
+
+  async function resolvePendingDraftTransition(strategy: 'save' | 'save-local' | 'discard') {
+    if (!pendingDraftTransition || isResolvingDraftTransition) {
+      return
+    }
+
+    setAuthError(null)
+    setImportError(null)
+    setIsResolvingDraftTransition(true)
+    try {
+      if (strategy === 'save') {
+        await saveCurrentDraft(true)
+      }
+      if (strategy === 'save-local') {
+        await saveCurrentDraft(false)
+      }
+      const action = pendingDraftTransition.action
+      setPendingDraftTransition(null)
+      await action()
+    } catch {
+      setAuthError('Unable to resolve unsaved changes right now.')
+    } finally {
+      setIsResolvingDraftTransition(false)
+    }
+  }
+
+  function cancelPendingDraftTransition() {
+    if (isResolvingDraftTransition) {
+      return
+    }
+    setPendingDraftTransition(null)
+  }
+
+  async function guardedOpenDocument(docId: string) {
+    runGuardedDraftTransition(() => openDocument(docId))
+  }
+
+  function guardedCreateNewDraft() {
+    runGuardedDraftTransition(createNewDraft)
   }
 
   async function handleDeleteRecentDocument(item: RecentDocumentItem) {
@@ -583,11 +646,7 @@ export function EditorShellPage() {
   }
 
   async function handleSave() {
-    const doc = await saveDraft()
-    if (user) {
-      await backUpLocalDocument(user.uid, doc)
-      await refreshRecentDocuments(user.uid)
-    }
+    await saveCurrentDraft(true)
   }
 
   async function handleSharePublish() {
@@ -697,7 +756,12 @@ export function EditorShellPage() {
   }
 
   function handleImportClick() {
-    importInputRef.current?.click()
+    runGuardedDraftTransition(() => {
+      if (importInputRef.current) {
+        importInputRef.current.value = ''
+        importInputRef.current.click()
+      }
+    })
   }
 
   async function handleImportFile(file: File | undefined) {
@@ -911,7 +975,7 @@ export function EditorShellPage() {
             {desktopSidebarTab === 'documents' ? (
               <>
                 <div className="sidebar-actions">
-                  <button type="button" className="primary-button" onClick={createNewDraft}>
+                  <button type="button" className="primary-button" onClick={guardedCreateNewDraft}>
                     <Plus size={18} />
                     New
                   </button>
@@ -923,6 +987,7 @@ export function EditorShellPage() {
                   documents={filteredDocuments}
                   recentDocumentsState={recentDocumentsState}
                   activeDocId={activeDocId}
+                  now={relativeTimeNow}
                   onOpen={(id) => void guardedOpenDocument(id)}
                   onDelete={(item) => void handleDeleteRecentDocument(item)}
                 />
@@ -970,9 +1035,10 @@ export function EditorShellPage() {
               documents={filteredDocuments}
               recentDocumentsState={recentDocumentsState}
               activeDocId={activeDocId}
+              now={relativeTimeNow}
               search={fileSearch}
               onSearch={setFileSearch}
-              onNew={createNewDraft}
+              onNew={guardedCreateNewDraft}
               onImport={handleImportClick}
               onOpen={(id) => void guardedOpenDocument(id)}
               onDelete={(item) => void handleDeleteRecentDocument(item)}
@@ -1008,6 +1074,57 @@ export function EditorShellPage() {
           Share
         </button>
       </footer>
+
+      {pendingDraftTransition ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={cancelPendingDraftTransition}>
+          <section
+            className="dialog-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsaved-changes-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="unsaved-changes-title">Unsaved changes</h2>
+            <p>Choose what to do with the current document before continuing.</p>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void resolvePendingDraftTransition('save')}
+                disabled={isResolvingDraftTransition}
+              >
+                <Save size={16} />
+                Save
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void resolvePendingDraftTransition('save-local')}
+                disabled={isResolvingDraftTransition}
+              >
+                <HardDrive size={16} />
+                Save locally
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void resolvePendingDraftTransition('discard')}
+                disabled={isResolvingDraftTransition}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={cancelPendingDraftTransition}
+                disabled={isResolvingDraftTransition}
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {isShareOpen ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setIsShareOpen(false)}>
@@ -1266,12 +1383,14 @@ export function DocumentList({
   documents,
   recentDocumentsState,
   activeDocId,
+  now,
   onOpen,
   onDelete,
 }: {
   documents: RecentDocumentItem[]
   recentDocumentsState: RecentDocumentsState
   activeDocId: string | null
+  now: number
   onOpen: (id: string) => void
   onDelete: (item: RecentDocumentItem) => void
 }) {
@@ -1302,7 +1421,7 @@ export function DocumentList({
                 </span>
                 <span className="document-row-copy">
                   <span className="document-title">{doc.title}</span>
-                  <small>{formatRelativeTime(doc.updatedAt)}</small>
+                  <small>{formatRelativeTime(doc.contentUpdatedAt ?? doc.updatedAt, now)}</small>
                 </span>
               </button>
               <button type="button" className="document-delete-button" onClick={() => onDelete(doc)} aria-label={`Delete ${doc.title}`} title="Delete">
@@ -1353,6 +1472,7 @@ export function FilesView({
   documents,
   recentDocumentsState,
   activeDocId,
+  now,
   search,
   onSearch,
   onNew,
@@ -1363,6 +1483,7 @@ export function FilesView({
   documents: RecentDocumentItem[]
   recentDocumentsState: RecentDocumentsState
   activeDocId: string | null
+  now: number
   search: string
   onSearch: (value: string) => void
   onNew: () => void
@@ -1407,7 +1528,7 @@ export function FilesView({
               <span className="document-row-copy">
                 <span className="document-title">{doc.title}</span>
                 <small>
-                  {formatRelativeTime(doc.updatedAt)} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB
+                  {formatRelativeTime(doc.contentUpdatedAt ?? doc.updatedAt, now)} · {Math.max(1, Math.round(doc.markdown.length / 1024))} KB
                 </small>
               </span>
               </button>

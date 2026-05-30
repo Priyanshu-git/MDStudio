@@ -25,6 +25,7 @@
 - User flows documented in `docs/USER_FLOWS.md`.
 - Desktop view modes and mobile tabs.
 - Desktop sidebar document/outline switching.
+- Recent Documents relative-time labels updating from `just now` to minute-based labels without persistence or sync calls.
 - Grouped theme picker behavior, including Escape/outside-click close and valid `ThemeName` values.
 - Account menu open/close behavior, inline sign-out confirmation, and mobile account access.
 - Mobile/editor and shared-page appbar hide/show behavior.

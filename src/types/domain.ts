@@ -14,6 +14,8 @@ export type Document = {
   markdown: string
   createdAt: number
   updatedAt: number
+  contentUpdatedAt?: number
+  syncUpdatedAt?: number
   source: DocumentSource
   sourceShareId?: string
   sourceOwnerUid?: string
@@ -48,6 +50,7 @@ export type RecentDocumentItem = {
   markdown: string
   createdAt: number
   updatedAt: number
+  contentUpdatedAt?: number
   localDocumentId?: string
   cloudDocumentId?: string
   source: DocumentSource

@@ -91,6 +91,38 @@ describe('document sync', () => {
     expect(recent[0].cloudDocumentId).toBe('cloud-1')
   })
 
+  it('does not write local or cloud data during a no-op signed-in refresh', async () => {
+    const local = await createDocument({
+      title: 'Already Synced',
+      markdown: '# Already Synced',
+      source: 'firebase',
+      cloudDocumentId: 'cloud-1',
+      cloudOwnerUid: 'user-1',
+      cloudUpdatedAt: 100,
+      lastSyncedAt: 100,
+      contentUpdatedAt: 100,
+    })
+    await db.documents.update(local.id, { updatedAt: 100, contentUpdatedAt: 100, syncUpdatedAt: 100 })
+    vi.mocked(listCloudDocuments).mockResolvedValue([
+      cloudDoc({
+        id: 'cloud-1',
+        title: 'Already Synced',
+        markdown: '# Already Synced',
+        updatedAt: 100,
+      }),
+    ])
+
+    await refreshRecentDocumentsForUser('user-1')
+    const afterRefresh = await getDocumentById(local.id)
+
+    expect(afterRefresh).toEqual(expect.objectContaining({
+      updatedAt: 100,
+      contentUpdatedAt: 100,
+      syncUpdatedAt: 100,
+    }))
+    expect(upsertCloudDocumentFromLocal).not.toHaveBeenCalled()
+  })
+
   it('uses newer cloud content when only the cloud copy changed', async () => {
     const local = await createDocument({
       title: 'Old',
@@ -101,7 +133,7 @@ describe('document sync', () => {
       cloudUpdatedAt: 100,
       lastSyncedAt: 100,
     })
-    await db.documents.update(local.id, { updatedAt: 100, lastSyncedAt: 100, cloudUpdatedAt: 100 })
+    await db.documents.update(local.id, { updatedAt: 100, contentUpdatedAt: 100, lastSyncedAt: 100, cloudUpdatedAt: 100 })
     vi.mocked(listCloudDocuments).mockResolvedValue([
       cloudDoc({
         id: 'cloud-1',
@@ -153,7 +185,21 @@ describe('document sync', () => {
       cloudDocumentId: local.id,
       cloudOwnerUid: 'user-1',
       source: 'firebase',
+      updatedAt: local.updatedAt,
+      contentUpdatedAt: local.contentUpdatedAt,
     }))
+  })
+
+  it('backs up only the provided local document', async () => {
+    const target = await createDocument({ title: 'Backup Me', markdown: '# Backup Me' })
+    const other = await createDocument({ title: 'Leave Me', markdown: '# Leave Me' })
+
+    await backUpLocalDocument('user-1', target)
+    const untouched = await getDocumentById(other.id)
+
+    expect(upsertCloudDocumentFromLocal).toHaveBeenCalledTimes(1)
+    expect(upsertCloudDocumentFromLocal).toHaveBeenCalledWith('user-1', target)
+    expect(untouched).toEqual(other)
   })
 
   it('deletes local recent documents', async () => {

@@ -15,12 +15,18 @@ export type CreateDocumentInput = {
   cloudOwnerUid?: string
   cloudUpdatedAt?: number
   lastSyncedAt?: number
+  contentUpdatedAt?: number
+  syncUpdatedAt?: number
 }
 
-export type UpdateDocumentInput = {
+export type UpdateDocumentContentInput = {
   title?: string
   markdown?: string
   theme?: ThemeName
+  contentUpdatedAt?: number
+}
+
+export type UpdateDocumentSyncMetadataInput = {
   source?: DocumentSource
   sourceShareId?: string
   sourceOwnerUid?: string
@@ -28,6 +34,7 @@ export type UpdateDocumentInput = {
   cloudOwnerUid?: string
   cloudUpdatedAt?: number
   lastSyncedAt?: number
+  syncUpdatedAt?: number
 }
 
 const DEFAULT_TITLE = 'Untitled Document'
@@ -40,8 +47,10 @@ function titleFromMarkdown(markdown: string): string {
 function normalizeDocument(doc: Document): Document {
   const { sourceShareId, sourceOwnerUid, ...rest } = doc
   const source = doc.source === 'firebase' ? 'firebase' : 'local'
+  const contentUpdatedAt = doc.contentUpdatedAt ?? doc.updatedAt
   return {
     ...rest,
+    contentUpdatedAt,
     title: doc.title || titleFromMarkdown(doc.markdown),
     source,
     ...(source === 'firebase' && sourceShareId ? { sourceShareId } : {}),
@@ -52,12 +61,14 @@ function normalizeDocument(doc: Document): Document {
 export async function createDocument(input: CreateDocumentInput | string): Promise<Document> {
   const payload = typeof input === 'string' ? { markdown: input } : input
   const now = Date.now()
+  const contentUpdatedAt = payload.contentUpdatedAt ?? now
   const doc: Document = {
     id: crypto.randomUUID(),
     title: payload.title?.trim() || titleFromMarkdown(payload.markdown),
     markdown: payload.markdown,
     createdAt: now,
-    updatedAt: now,
+    updatedAt: contentUpdatedAt,
+    contentUpdatedAt,
     source: payload.source ?? 'local',
     ...(payload.sourceShareId ? { sourceShareId: payload.sourceShareId } : {}),
     ...(payload.sourceOwnerUid ? { sourceOwnerUid: payload.sourceOwnerUid } : {}),
@@ -65,6 +76,7 @@ export async function createDocument(input: CreateDocumentInput | string): Promi
     ...(payload.cloudOwnerUid ? { cloudOwnerUid: payload.cloudOwnerUid } : {}),
     ...(payload.cloudUpdatedAt ? { cloudUpdatedAt: payload.cloudUpdatedAt } : {}),
     ...(payload.lastSyncedAt ? { lastSyncedAt: payload.lastSyncedAt } : {}),
+    ...(payload.syncUpdatedAt ? { syncUpdatedAt: payload.syncUpdatedAt } : {}),
     ...(payload.theme ? { theme: payload.theme } : {}),
   }
   await db.documents.put(doc)
@@ -78,8 +90,10 @@ export async function getDocumentById(id: string): Promise<Document | undefined>
 }
 
 export async function listDocuments(): Promise<Document[]> {
-  const docs = await db.documents.orderBy('updatedAt').reverse().toArray()
-  return docs.map(normalizeDocument)
+  const docs = await db.documents.toArray()
+  return docs
+    .map(normalizeDocument)
+    .sort((left, right) => documentContentTimestamp(right) - documentContentTimestamp(left))
 }
 
 export async function findDocumentByCloudDocumentId(cloudDocumentId: string): Promise<Document | undefined> {
@@ -87,12 +101,36 @@ export async function findDocumentByCloudDocumentId(cloudDocumentId: string): Pr
   return doc ? normalizeDocument(doc) : undefined
 }
 
-export async function updateDocument(id: string, input: UpdateDocumentInput): Promise<void> {
-  await db.documents.update(id, { ...input, updatedAt: Date.now() })
+export function documentContentTimestamp(doc: Pick<Document, 'updatedAt' | 'contentUpdatedAt'>): number {
+  return doc.contentUpdatedAt ?? doc.updatedAt
+}
+
+export async function updateDocumentContent(id: string, input: UpdateDocumentContentInput): Promise<void> {
+  const { contentUpdatedAt, ...content } = input
+  const nextContentUpdatedAt = contentUpdatedAt ?? Date.now()
+  await db.documents.update(id, { ...content, updatedAt: nextContentUpdatedAt, contentUpdatedAt: nextContentUpdatedAt })
+}
+
+export async function updateDocumentSyncMetadata(id: string, input: UpdateDocumentSyncMetadataInput): Promise<void> {
+  await db.documents.update(id, { ...input, syncUpdatedAt: input.syncUpdatedAt ?? Date.now() })
+}
+
+export async function updateDocument(
+  id: string,
+  input: UpdateDocumentContentInput & UpdateDocumentSyncMetadataInput,
+): Promise<void> {
+  const { title, markdown, theme, contentUpdatedAt, ...syncMetadata } = input
+  const hasContentUpdate = title !== undefined || markdown !== undefined || theme !== undefined || contentUpdatedAt !== undefined
+  if (hasContentUpdate) {
+    await updateDocumentContent(id, { title, markdown, theme, contentUpdatedAt })
+  }
+  if (Object.keys(syncMetadata).length > 0) {
+    await updateDocumentSyncMetadata(id, syncMetadata)
+  }
 }
 
 export async function updateDocumentMarkdown(id: string, markdown: string): Promise<void> {
-  await updateDocument(id, { markdown })
+  await updateDocumentContent(id, { markdown })
 }
 
 export async function deleteDocument(id: string): Promise<void> {
@@ -130,10 +168,10 @@ export async function getOrCreateActiveDocument(seedMarkdown: string): Promise<D
     }
   }
 
-  const latest = await db.documents.orderBy('updatedAt').last()
+  const latest = (await listDocuments())[0]
   if (latest) {
     await setActiveDocumentId(latest.id)
-    return normalizeDocument(latest)
+    return latest
   }
 
   return createDocument({ markdown: seedMarkdown, title: titleFromMarkdown(seedMarkdown) })

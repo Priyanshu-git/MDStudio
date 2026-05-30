@@ -1,10 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { DocumentList, FilesView } from './editor/EditorShellPage'
+import { useRelativeTimeNow } from './editor/useRelativeTimeNow'
 import { listenToAuthState, signOutCurrentUser } from './firebase/auth'
 import { useAppStore } from './state/useAppStore'
+import { db } from './storage/db'
+import { createDocument, setActiveDocumentId } from './storage/documents'
+import { backUpLocalDocument } from './storage/documentSync'
 import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './storage/shareDocuments'
 
 const authMockState = vi.hoisted(() => ({
@@ -51,8 +55,10 @@ function mockMobileViewport(matches: boolean) {
 }
 
 describe('App routing shell', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    await db.documents.clear()
+    await db.appState.clear()
     authMockState.currentUser = null
     mockMobileViewport(false)
     useAppStore.setState({
@@ -87,6 +93,94 @@ describe('App routing shell', () => {
     )
     expect(screen.getByText('MD Studio')).toBeInTheDocument()
     expect(document.title).toBe('Markdown Rendering Test File | MD Studio')
+  })
+
+  async function seedUnsavedDocumentSwitch(signedIn = false) {
+    authMockState.currentUser = signedIn ? { uid: 'user-1', displayName: 'Ada', email: 'ada@example.com' } : null
+    const active = await createDocument({ title: 'Active Doc', markdown: '# Active Doc' })
+    const other = await createDocument({ title: 'Other Doc', markdown: '# Other Doc' })
+    await setActiveDocumentId(active.id)
+    const recentDocuments = [
+      {
+        id: other.id,
+        localDocumentId: other.id,
+        title: other.title,
+        markdown: other.markdown,
+        createdAt: other.createdAt,
+        updatedAt: other.updatedAt,
+        contentUpdatedAt: other.contentUpdatedAt,
+        source: other.source,
+        syncStatus: 'local-only' as const,
+      },
+    ]
+    useAppStore.setState({
+      isHydrated: true,
+      activeDocId: active.id,
+      draftTitle: active.title,
+      draftMarkdown: '# Active Doc\n\nChanged',
+      lastLocalSavedTitle: active.title,
+      lastLocalSavedMarkdown: active.markdown,
+      saveStatus: 'unsaved',
+      recentDocumentsState: 'ready',
+      recentDocuments,
+    })
+    window.history.pushState({}, '', '/editor')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    useAppStore.setState({ recentDocumentsState: 'ready', recentDocuments })
+    fireEvent.click(screen.getByRole('button', { name: 'Documents' }))
+    const otherDocButtons = await screen.findAllByRole('button', { name: /Other Doc/ })
+    const otherDocOpenButton = otherDocButtons.find((button) => button.classList.contains('document-row-main'))
+    expect(otherDocOpenButton).toBeDefined()
+    fireEvent.click(otherDocOpenButton as HTMLButtonElement)
+    await screen.findByRole('dialog', { name: 'Unsaved changes' })
+    return { active, other }
+  }
+
+  it('prompts before opening another document with unsaved changes', async () => {
+    const { active } = await seedUnsavedDocumentSwitch()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument()
+    expect(useAppStore.getState().activeDocId).toBe(active.id)
+    expect(useAppStore.getState().draftMarkdown).toBe('# Active Doc\n\nChanged')
+  })
+
+  it('can save locally before opening another document without Firestore backup', async () => {
+    const { other } = await seedUnsavedDocumentSwitch()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save locally' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().activeDocId).toBe(other.id)
+    })
+    expect(backUpLocalDocument).not.toHaveBeenCalled()
+  })
+
+  it('can save and back up before opening another document when signed in', async () => {
+    const { other } = await seedUnsavedDocumentSwitch(true)
+
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().activeDocId).toBe(other.id)
+    })
+    expect(backUpLocalDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('can discard unsaved changes before opening another document', async () => {
+    const { other } = await seedUnsavedDocumentSwitch()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().activeDocId).toBe(other.id)
+    })
+    expect(backUpLocalDocument).not.toHaveBeenCalled()
   })
 
   it('updates the browser title from the editor draft title', async () => {
@@ -153,9 +247,8 @@ describe('App routing shell', () => {
     expect(screen.getByText('Sign in to see your backed up documents')).toBeInTheDocument()
   })
 
-  it('shows recent document source icons and relative time on desktop', async () => {
+  it('shows recent document source icons and relative time on desktop', () => {
     const now = new Date('2026-05-17T10:00:00.000Z').getTime()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
     const documents = [
       {
         id: 'firebase-doc',
@@ -182,6 +275,7 @@ describe('App routing shell', () => {
         documents={documents}
         recentDocumentsState="ready"
         activeDocId="local-doc"
+        now={now}
         onOpen={vi.fn()}
         onDelete={vi.fn()}
       />,
@@ -193,8 +287,53 @@ describe('App routing shell', () => {
     expect(screen.getAllByLabelText('Local document').length).toBeGreaterThan(0)
     expect(screen.getAllByLabelText('Backed up document').length).toBeGreaterThan(0)
     expect(screen.queryByText(new Date(now - 5 * 60 * 1000).toLocaleDateString())).not.toBeInTheDocument()
+  })
 
-    nowSpy.mockRestore()
+  it('updates desktop relative document time every minute', () => {
+    const initialNow = new Date('2026-05-17T10:00:00.000Z').getTime()
+    vi.useFakeTimers({ now: initialNow })
+    const documents = [
+      {
+        id: 'local-doc',
+        title: 'Local Notes',
+        markdown: '# Local Notes',
+        createdAt: initialNow,
+        updatedAt: initialNow,
+        contentUpdatedAt: initialNow,
+        source: 'local',
+        syncStatus: 'local-only',
+      },
+    ] as ReturnType<typeof useAppStore.getState>['recentDocuments']
+
+    function RelativeTimeHarness() {
+      const now = useRelativeTimeNow()
+      return (
+        <DocumentList
+          documents={documents}
+          recentDocumentsState="ready"
+          activeDocId="local-doc"
+          now={now}
+          onOpen={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+    }
+
+    render(<RelativeTimeHarness />)
+
+    expect(screen.getByText('just now')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(60 * 1000)
+    })
+    expect(screen.getByText('1 min ago')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(60 * 1000)
+    })
+    expect(screen.getByText('2 mins ago')).toBeInTheDocument()
+
+    vi.useRealTimers()
   })
 
   it('exposes delete action for desktop recent documents', () => {
@@ -215,6 +354,7 @@ describe('App routing shell', () => {
         documents={[document]}
         recentDocumentsState="ready"
         activeDocId={null}
+        now={2}
         onOpen={vi.fn()}
         onDelete={onDelete}
       />,
@@ -227,7 +367,6 @@ describe('App routing shell', () => {
 
   it('shows recent document source icons and relative time on mobile files view', () => {
     const now = new Date('2026-05-17T10:00:00.000Z').getTime()
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
     const documents = [
       {
         id: 'firebase-doc',
@@ -245,6 +384,7 @@ describe('App routing shell', () => {
         documents={documents}
         recentDocumentsState="ready"
         activeDocId="firebase-doc"
+        now={now}
         search=""
         onSearch={vi.fn()}
         onNew={vi.fn()}
@@ -258,7 +398,6 @@ describe('App routing shell', () => {
     expect(screen.getByText('2 days ago · 1 KB')).toBeInTheDocument()
     expect(screen.getByLabelText('Backed up document')).toBeInTheDocument()
 
-    nowSpy.mockRestore()
   })
 
   it('scrolls editor and preview when selecting an outline item from preview mode', async () => {

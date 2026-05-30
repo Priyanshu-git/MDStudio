@@ -2,10 +2,12 @@ import type { CloudDocument, Document, RecentDocumentItem } from '../types'
 import {
   createDocument,
   deleteDocument,
+  documentContentTimestamp,
   findDocumentByCloudDocumentId,
   getDocumentById,
   listDocuments,
-  updateDocument,
+  updateDocumentContent,
+  updateDocumentSyncMetadata,
 } from './documents'
 import { listCloudDocuments, softDeleteCloudDocument, upsertCloudDocumentFromLocal } from './cloudDocuments'
 
@@ -18,6 +20,7 @@ function toRecentItem(doc: Document, syncStatus: RecentDocumentItem['syncStatus'
     markdown: doc.markdown,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
+    contentUpdatedAt: documentContentTimestamp(doc),
     source: doc.cloudDocumentId ? 'firebase' : doc.source,
     syncStatus,
   }
@@ -43,7 +46,9 @@ async function hydrateCloudDocument(uid: string, cloudDocument: CloudDocument): 
     cloudDocumentId: cloudDocument.id,
     cloudOwnerUid: uid,
     cloudUpdatedAt: cloudDocument.updatedAt,
-    lastSyncedAt: Date.now(),
+    lastSyncedAt: cloudDocument.updatedAt,
+    contentUpdatedAt: cloudDocument.updatedAt || undefined,
+    syncUpdatedAt: Date.now(),
   })
 }
 
@@ -53,11 +58,12 @@ async function reconcileMatchedDocument(
   cloudDocument: CloudDocument,
 ): Promise<{ document: Document; syncStatus: RecentDocumentItem['syncStatus'] }> {
   const lastSyncedAt = localDocument.lastSyncedAt ?? 0
-  const localChanged = localDocument.updatedAt > lastSyncedAt
+  const localContentUpdatedAt = documentContentTimestamp(localDocument)
+  const localChanged = localContentUpdatedAt > lastSyncedAt
   const cloudChanged = cloudDocument.updatedAt > lastSyncedAt
 
   if (localChanged && cloudChanged && localDocument.markdown !== cloudDocument.markdown) {
-    await updateDocument(localDocument.id, {
+    await updateDocumentSyncMetadata(localDocument.id, {
       cloudDocumentId: cloudDocument.id,
       cloudOwnerUid: uid,
       cloudUpdatedAt: cloudDocument.updatedAt,
@@ -66,52 +72,65 @@ async function reconcileMatchedDocument(
     return { document: (await getDocumentById(localDocument.id))!, syncStatus: 'conflict' }
   }
 
-  if (cloudChanged && cloudDocument.updatedAt > localDocument.updatedAt) {
-    await updateDocument(localDocument.id, {
+  if (cloudChanged && cloudDocument.updatedAt > localContentUpdatedAt) {
+    await updateDocumentContent(localDocument.id, {
       title: cloudDocument.title,
       markdown: cloudDocument.markdown,
+      contentUpdatedAt: cloudDocument.updatedAt,
+    })
+    await updateDocumentSyncMetadata(localDocument.id, {
       source: 'firebase',
       cloudDocumentId: cloudDocument.id,
       cloudOwnerUid: uid,
       cloudUpdatedAt: cloudDocument.updatedAt,
-      lastSyncedAt: Date.now(),
+      lastSyncedAt: cloudDocument.updatedAt,
     })
     return { document: (await getDocumentById(localDocument.id))!, syncStatus: 'backed-up' }
   }
 
-  if (localChanged && localDocument.updatedAt > cloudDocument.updatedAt) {
+  if (localChanged && localContentUpdatedAt > cloudDocument.updatedAt) {
     const synced = await upsertCloudDocumentFromLocal(uid, {
       ...localDocument,
       cloudDocumentId: cloudDocument.id,
     })
-    await updateDocument(localDocument.id, {
+    await updateDocumentSyncMetadata(localDocument.id, {
       source: 'firebase',
       cloudDocumentId: synced.id,
       cloudOwnerUid: uid,
       cloudUpdatedAt: synced.updatedAt,
-      lastSyncedAt: Date.now(),
+      lastSyncedAt: synced.updatedAt,
     })
     return { document: (await getDocumentById(localDocument.id))!, syncStatus: 'backed-up' }
   }
 
-  await updateDocument(localDocument.id, {
+  const hasMissingMetadata = localDocument.source !== 'firebase'
+    || localDocument.cloudDocumentId !== cloudDocument.id
+    || localDocument.cloudOwnerUid !== uid
+    || localDocument.cloudUpdatedAt !== cloudDocument.updatedAt
+    || !localDocument.lastSyncedAt
+
+  if (!hasMissingMetadata) {
+    return { document: localDocument, syncStatus: 'backed-up' }
+  }
+
+  await updateDocumentSyncMetadata(localDocument.id, {
     source: 'firebase',
     cloudDocumentId: cloudDocument.id,
     cloudOwnerUid: uid,
     cloudUpdatedAt: cloudDocument.updatedAt,
-    lastSyncedAt: localDocument.lastSyncedAt ?? Date.now(),
+    lastSyncedAt: localDocument.lastSyncedAt ?? Math.max(localContentUpdatedAt, cloudDocument.updatedAt),
   })
   return { document: (await getDocumentById(localDocument.id))!, syncStatus: 'backed-up' }
 }
 
 export async function backUpLocalDocument(uid: string, localDocument: Document): Promise<Document> {
   const cloudDocument = await upsertCloudDocumentFromLocal(uid, localDocument)
-  await updateDocument(localDocument.id, {
+  await updateDocumentSyncMetadata(localDocument.id, {
     source: 'firebase',
     cloudDocumentId: cloudDocument.id,
     cloudOwnerUid: uid,
     cloudUpdatedAt: cloudDocument.updatedAt,
-    lastSyncedAt: Date.now(),
+    lastSyncedAt: cloudDocument.updatedAt,
   })
   return (await getDocumentById(localDocument.id))!
 }
@@ -141,7 +160,7 @@ export async function refreshRecentDocumentsForUser(uid: string): Promise<Recent
     }
   }
 
-  return recentItems.sort((left, right) => right.updatedAt - left.updatedAt)
+  return recentItems.sort((left, right) => (right.contentUpdatedAt ?? right.updatedAt) - (left.contentUpdatedAt ?? left.updatedAt))
 }
 
 export async function refreshLocalRecentDocuments(): Promise<RecentDocumentItem[]> {
