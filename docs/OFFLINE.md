@@ -13,6 +13,7 @@ Markdown Studio is designed to be fully functional offline.
 - **Editing:** Create, edit, save, and reopen documents.
 - **Local documents:** Reopen recent documents from IndexedDB.
 - **Import:** Import `.md` files into a local draft.
+- **PWA file open:** On supported desktop Chromium browsers, installed copies can open `.md` files from the operating system and import them into the editor.
 - **Export:** Export Markdown and HTML locally; PDF uses the browser print flow.
 - **Diagram export:** Mermaid SVG/PNG export works for diagrams that render from local markdown.
 - **Rendering:** Full markdown rendering including:
@@ -42,3 +43,28 @@ You can "install" Markdown Studio to your desktop or mobile device:
 1. Open Markdown Studio in your browser.
 2. Look for the "Install" icon in the address bar (Chrome/Edge) or use "Add to Home Screen" (iOS/Android).
 3. The app will then appear in your app drawer or desktop and open in its own window.
+
+## File Handling
+
+Markdown Studio registers `.md` files as `text/markdown` in the generated PWA manifest:
+
+```json
+{
+  "file_handlers": [
+    {
+      "action": "/open-md",
+      "accept": {
+        "text/markdown": [".md"]
+      }
+    }
+  ]
+}
+```
+
+Browser requirements:
+
+- Desktop Chrome or Microsoft Edge 102 or newer.
+- Installed PWA on a secure origin. HTTPS is required in production; `localhost` works for local development.
+- Reinstall the PWA after manifest file-handler changes so the browser updates the Windows file association.
+
+When the File Handling API is unavailable, `/open-md` shows a standard `.md` import control instead of failing.

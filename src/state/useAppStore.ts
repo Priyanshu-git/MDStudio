@@ -296,6 +296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastCloudSavedMarkdown: null,
       saveStatus: 'local-only',
       saveError: null,
+      isHydrated: true,
       mobileTab: 'write',
     })
   },

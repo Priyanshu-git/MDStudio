@@ -21,6 +21,16 @@ export default defineConfig({
         short_name: 'MD Studio',
         description: 'Local-first markdown editor and preview',
         theme_color: '#ffffff',
+        start_url: '/editor',
+        scope: '/',
+        file_handlers: [
+          {
+            action: '/open-md',
+            accept: {
+              'text/markdown': ['.md'],
+            },
+          },
+        ],
         icons: [
           {
             src: 'vite.svg',

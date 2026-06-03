@@ -34,6 +34,7 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 - Code-block copy, Mermaid SVG/PNG export, and lazy-loaded heavy renderers.
 - Theme persistence for `github-light`, `github-dark`, `pastel-mint`, `minimal-ivory`, `one-dark`, and `blue-eclipse`.
 - `.md` import plus Markdown, HTML, and browser print/PDF export.
+- Installed PWA file handling for opening `.md` files directly from the operating system.
 - Google sign-in for sharing, an account menu, and inline sign-out confirmation.
 - Public `/share/:id` read-only pages with owner-only `Edit Original`, non-owner `Make a Copy`, and local source tracking for Firebase-backed documents.
 
@@ -42,6 +43,26 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 Markdown Studio is a Progressive Web App (PWA) that works offline. It uses a service worker to cache assets and IndexedDB for local document storage.
 
 For more details, see [Offline Support](docs/OFFLINE.md).
+
+### Opening `.md` files from Windows Explorer
+
+The PWA manifest registers `.md` files with MIME type `text/markdown` through the File Handling API. The handler action is `/open-md`; when Chrome or Edge launches the installed app with a markdown file, the route reads the first file from `launchQueue.setConsumer()` and loads it as a local-only draft in the existing editor.
+
+Requirements:
+
+- Use desktop Chrome or Microsoft Edge 102 or newer. The feature is Chromium-only and not supported in Firefox or Safari.
+- Install the production PWA from an HTTPS origin. `localhost` is acceptable for local development, but Windows file association testing should use an installed PWA.
+- Reinstall the PWA after changing `file_handlers`; browsers read file-handler associations during installation and may reset handler permission when the manifest changes.
+- If Windows does not make MD Studio the default app for `.md`, right-click a markdown file, choose **Open with**, and select the installed MD Studio PWA.
+
+Local setup:
+
+```bash
+npm run build
+npm run preview
+```
+
+Open the preview URL in Chrome or Edge, install MD Studio, close the PWA window, then open a `.md` file from Windows Explorer with the installed MD Studio app. Unsupported browsers fall back to the normal `.md` import button on `/open-md`.
 
 ## Firestore Sharing
 

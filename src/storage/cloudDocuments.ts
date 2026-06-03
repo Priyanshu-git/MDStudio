@@ -1,11 +1,11 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   orderBy,
   query,
   setDoc,
-  updateDoc,
 } from 'firebase/firestore'
 import { firestore } from '../firebase/client'
 import type { CloudDocument, Document } from '../types'
@@ -62,9 +62,6 @@ export async function upsertCloudDocumentFromLocal(uid: string, localDocument: D
   return { id: cloudDocumentId, ...payload }
 }
 
-export async function softDeleteCloudDocument(uid: string, cloudDocumentId: string): Promise<void> {
-  await updateDoc(userDocumentRef(uid, cloudDocumentId), {
-    deletedAt: Date.now(),
-    updatedAt: Date.now(),
-  })
+export async function deleteCloudDocument(uid: string, cloudDocumentId: string): Promise<void> {
+  await deleteDoc(userDocumentRef(uid, cloudDocumentId))
 }

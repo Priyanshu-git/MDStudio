@@ -61,6 +61,8 @@ describe('App routing shell', () => {
     await db.appState.clear()
     authMockState.currentUser = null
     mockMobileViewport(false)
+    Reflect.deleteProperty(window, 'launchQueue')
+    Reflect.deleteProperty(window, 'LaunchParams')
     useAppStore.setState({
       activeDocId: null,
       activeShareId: null,
@@ -245,6 +247,68 @@ describe('App routing shell', () => {
     expect(documentsTab).toHaveClass('active')
     expect(screen.getByRole('heading', { name: 'Recent Documents' })).toBeInTheDocument()
     expect(screen.getByText('Sign in to see your backed up documents')).toBeInTheDocument()
+  })
+
+  it('loads a launched markdown file into the editor route', async () => {
+    let consumer: ((launchParams: LaunchParams) => void) | null = null
+    class MockLaunchParams {
+      files: FileSystemFileHandle[] = []
+    }
+    MockLaunchParams.prototype.files = []
+    Object.defineProperty(window, 'LaunchParams', {
+      configurable: true,
+      value: MockLaunchParams,
+    })
+    Object.defineProperty(window, 'launchQueue', {
+      configurable: true,
+      value: {
+        setConsumer: vi.fn((nextConsumer: (launchParams: LaunchParams) => void) => {
+          consumer = nextConsumer
+        }),
+      },
+    })
+    window.history.pushState({}, '', '/open-md')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const file = {
+      name: 'explorer-file.md',
+      text: async () => '# Explorer File\n\nOpened from Windows.',
+    } as File
+    await act(async () => {
+      consumer?.({
+        files: [
+          {
+            name: file.name,
+            getFile: async () => file,
+          } as FileSystemFileHandle,
+        ],
+      })
+    })
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/editor')
+    })
+    expect(useAppStore.getState().draftTitle).toBe('explorer-file')
+    expect(useAppStore.getState().draftMarkdown).toBe('# Explorer File\n\nOpened from Windows.')
+    expect(screen.getByRole('heading', { level: 1, name: 'Explorer File' })).toBeInTheDocument()
+  })
+
+  it('falls back to manual import when File Handling API is unavailable', () => {
+    window.history.pushState({}, '', '/open-md')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(screen.getByText('This browser cannot open files through the PWA File Handling API.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Import .md file' })).toBeInTheDocument()
   })
 
   it('shows recent document source icons and relative time on desktop', () => {

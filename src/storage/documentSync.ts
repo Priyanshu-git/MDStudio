@@ -9,7 +9,7 @@ import {
   updateDocumentContent,
   updateDocumentSyncMetadata,
 } from './documents'
-import { listCloudDocuments, softDeleteCloudDocument, upsertCloudDocumentFromLocal } from './cloudDocuments'
+import { deleteCloudDocument, listCloudDocuments, upsertCloudDocumentFromLocal } from './cloudDocuments'
 
 function toRecentItem(doc: Document, syncStatus: RecentDocumentItem['syncStatus']): RecentDocumentItem {
   return {
@@ -170,7 +170,7 @@ export async function refreshLocalRecentDocuments(): Promise<RecentDocumentItem[
 
 export async function deleteRecentDocument(uid: string | null, item: RecentDocumentItem): Promise<void> {
   if (uid && item.cloudDocumentId) {
-    await softDeleteCloudDocument(uid, item.cloudDocumentId)
+    await deleteCloudDocument(uid, item.cloudDocumentId)
   }
 
   if (item.localDocumentId) {

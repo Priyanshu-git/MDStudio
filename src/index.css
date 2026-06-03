@@ -954,6 +954,36 @@ a {
   overflow: hidden;
 }
 
+.file-open-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.file-open-panel {
+  width: min(100%, 420px);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 30px 24px;
+  text-align: center;
+  background: var(--surface);
+}
+
+.file-open-panel h1,
+.file-open-panel p {
+  margin: 0;
+}
+
+.file-open-panel p {
+  color: var(--muted);
+}
+
 .panel-header {
   min-height: 52px;
   display: flex;

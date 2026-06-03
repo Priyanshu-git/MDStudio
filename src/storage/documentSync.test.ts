@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from './db'
 import { createDocument, getDocumentById } from './documents'
 import { backUpLocalDocument, deleteRecentDocument, refreshRecentDocumentsForUser } from './documentSync'
-import { listCloudDocuments, softDeleteCloudDocument, upsertCloudDocumentFromLocal } from './cloudDocuments'
+import { deleteCloudDocument, listCloudDocuments, upsertCloudDocumentFromLocal } from './cloudDocuments'
 import type { CloudDocument } from '../types'
 
 vi.mock('./cloudDocuments', () => ({
+  deleteCloudDocument: vi.fn(),
   listCloudDocuments: vi.fn(),
   upsertCloudDocumentFromLocal: vi.fn(),
-  softDeleteCloudDocument: vi.fn(),
 }))
 
 describe('document sync', () => {
@@ -217,10 +217,10 @@ describe('document sync', () => {
     })
 
     expect(await getDocumentById(local.id)).toBeUndefined()
-    expect(softDeleteCloudDocument).not.toHaveBeenCalled()
+    expect(deleteCloudDocument).not.toHaveBeenCalled()
   })
 
-  it('soft deletes backed-up cloud documents before removing the local copy', async () => {
+  it('hard deletes backed-up cloud documents before removing the local copy', async () => {
     const local = await createDocument({
       title: 'Backed Up',
       markdown: '# Backed Up',
@@ -240,8 +240,32 @@ describe('document sync', () => {
       syncStatus: 'backed-up',
     })
 
-    expect(softDeleteCloudDocument).toHaveBeenCalledWith('user-1', 'cloud-1')
+    expect(deleteCloudDocument).toHaveBeenCalledWith('user-1', 'cloud-1')
     expect(await getDocumentById(local.id)).toBeUndefined()
+  })
+
+  it('keeps the local copy when backed-up cloud document deletion fails', async () => {
+    vi.mocked(deleteCloudDocument).mockRejectedValueOnce(new Error('delete failed'))
+    const local = await createDocument({
+      title: 'Backed Up',
+      markdown: '# Backed Up',
+      source: 'firebase',
+      cloudDocumentId: 'cloud-1',
+    })
+
+    await expect(deleteRecentDocument('user-1', {
+      id: local.id,
+      localDocumentId: local.id,
+      cloudDocumentId: 'cloud-1',
+      title: local.title,
+      markdown: local.markdown,
+      createdAt: local.createdAt,
+      updatedAt: local.updatedAt,
+      source: 'firebase',
+      syncStatus: 'backed-up',
+    })).rejects.toThrow('delete failed')
+
+    expect(await getDocumentById(local.id)).toEqual(expect.objectContaining({ id: local.id }))
   })
 })
 

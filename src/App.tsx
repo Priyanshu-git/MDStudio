@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { EditorShellPage } from './editor/EditorShellPage'
+import { FileOpenPage } from './file-handling/FileOpenPage'
 import { HomePage } from './components/pages/HomePage'
 import { LocalDocumentPage } from './components/pages/LocalDocumentPage'
 import { SharePlaceholderPage } from './components/pages/SharePlaceholderPage'
@@ -121,6 +122,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/editor" element={<EditorShellPage />} />
+      <Route path="/open-md" element={<FileOpenPage />} />
       <Route path="/doc/:id" element={<LocalDocumentPage />} />
       <Route path="/share/:id" element={<SharePlaceholderPage />} />
       <Route path="*" element={<Navigate to="/editor" replace />} />

@@ -11,7 +11,7 @@ class MarkdownStudioDb extends Dexie {
   appState!: Table<AppStateEntry, string>
 
   constructor() {
-    super('markdownStudioDb')
+    super(import.meta.env.MODE === 'test' ? `markdownStudioDb-${crypto.randomUUID()}` : 'markdownStudioDb')
     this.version(1).stores({
       documents: 'id,updatedAt,createdAt',
       appState: 'key',

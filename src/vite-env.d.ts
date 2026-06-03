@@ -13,3 +13,18 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface LaunchParams {
+  readonly files: FileSystemFileHandle[]
+}
+
+interface LaunchQueue {
+  setConsumer(consumer: (launchParams: LaunchParams) => void): void
+}
+
+interface Window {
+  readonly launchQueue?: LaunchQueue
+  readonly LaunchParams?: {
+    prototype: LaunchParams
+  }
+}

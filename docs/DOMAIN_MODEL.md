@@ -37,7 +37,7 @@ type CloudDocument = {
   createdAt: number;
   updatedAt: number;
   localDocumentId?: string;
-  deletedAt?: number;
+  deletedAt?: number; // legacy tombstone, hidden when present
 };
 ```
 

@@ -47,11 +47,12 @@ Collection path: `users/{uid}/documents/{documentId}`
   "createdAt": 1710000000000,
   "updatedAt": 1710000000000,
   "localDocumentId": "optional local id",
-  "deletedAt": "optional timestamp"
+  "deletedAt": "legacy optional timestamp"
 }
 ```
 
 Only the authenticated owner can read or write these documents.
+Deleting a private backup hard-deletes the document from this collection. Older records with `deletedAt` are legacy tombstones and are ignored by the app.
 
 ## Shared Firestore Document Shape
 

@@ -72,7 +72,7 @@ Signed-in Recent Documents are built from local IndexedDB documents and private 
 
 The sync layer matches local and cloud documents by `cloudDocumentId`. Cloud-only documents are hydrated into local working copies before opening. Saving backs up only the active saved document. Newer cloud-only edits update the local working copy. If both sides changed after the last sync point, the item is marked as a conflict instead of silently overwriting either version. Metadata-only sync updates and relative-time UI refreshes do not make unrelated documents appear recently edited.
 
-Deleting a backed-up document soft-deletes the private cloud document and removes the local working copy. Public share links in `sharedDocuments` are not deleted by this action.
+Deleting a backed-up document hard-deletes the private cloud document and removes the local working copy. Public share links in `sharedDocuments` are not deleted by this action. Older private records with `deletedAt` are legacy tombstones and remain hidden from the app.
 
 ## Sharing From The Editor
 
