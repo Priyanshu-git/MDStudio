@@ -109,6 +109,7 @@ type AppState = {
   hydrateTheme: () => Promise<void>
   hydrateDocument: () => Promise<void>
   createNewDraft: () => void
+  createSampleDraft: () => void
   openDocument: (docId: string) => Promise<void>
   importMarkdownDraft: (title: string, markdown: string) => void
   saveDraft: () => Promise<Document>
@@ -260,6 +261,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastCloudSavedMarkdown: null,
       saveStatus: 'local-only',
       saveError: null,
+      mobileTab: 'write',
+      desktopViewMode: 'split',
+    })
+  },
+  createSampleDraft: () => {
+    set({
+      activeDocId: null,
+      activeShareId: null,
+      draftTitle: 'Markdown Rendering Test File',
+      draftMarkdown: DEFAULT_MARKDOWN,
+      lastLocalSavedTitle: '',
+      lastLocalSavedMarkdown: '',
+      lastCloudSavedTitle: null,
+      lastCloudSavedMarkdown: null,
+      saveStatus: 'local-only',
+      saveError: null,
+      isHydrated: true,
       mobileTab: 'write',
       desktopViewMode: 'split',
     })

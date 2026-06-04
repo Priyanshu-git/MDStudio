@@ -1,8 +1,8 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { User } from 'firebase/auth'
+import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   Bold,
   BookOpen,
   CheckSquare,
@@ -14,19 +14,17 @@ import {
   GitBranch,
   Cloud,
   ChevronDown,
-  ChevronRight,
   Heading1,
   Heading2,
   HardDrive,
+  Home,
   Image,
   Italic,
   Link,
   List,
   ListOrdered,
   LogIn,
-  LogOut,
   Minus,
-  Moon,
   Plus,
   Quote,
   Redo2,
@@ -38,8 +36,9 @@ import {
   Trash2,
   Undo2,
   Upload,
-  UserCircle,
 } from 'lucide-react'
+import { AccountButton, AccountMenu } from '../components/layout/AccountMenu'
+import { getSelectedThemeLabel, themeGroups, type AccountMenuView } from '../components/layout/accountMenuConfig'
 import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
 import { getDocumentById, updateDocument } from '../storage/documents'
@@ -47,7 +46,7 @@ import { publishSharedDocument, updateSharedDocument } from '../storage/shareDoc
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
 import { useAutoHideAppbar } from '../hooks/useAutoHideAppbar'
 import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle } from './MarkdownEditor'
-import type { DesktopViewMode, MobileTab, RecentDocumentItem, RecentDocumentsState, SaveStatus, ThemeName } from '../types'
+import type { DesktopViewMode, MobileTab, RecentDocumentItem, RecentDocumentsState, SaveStatus } from '../types'
 import type { MarkdownInsertAction } from './markdownInsert'
 import { backUpLocalDocument, deleteRecentDocument } from '../storage/documentSync'
 import { useRelativeTimeNow } from './useRelativeTimeNow'
@@ -67,8 +66,6 @@ type ToolbarItem = {
 
 type DesktopSidebarTab = 'documents' | 'outline'
 
-type AccountMenuView = 'main' | 'theme'
-
 type LinkDialogState = {
   mode: 'link' | 'image'
   text: string
@@ -78,16 +75,6 @@ type LinkDialogState = {
 
 type PendingDraftTransition = {
   action: () => void | Promise<void>
-}
-
-type ThemeOption = {
-  value: ThemeName
-  label: string
-}
-
-type ThemeGroup = {
-  label: string
-  options: ThemeOption[]
 }
 
 const toolbarItems: ToolbarItem[] = [
@@ -114,25 +101,6 @@ const mobileTabs: Array<{ id: MobileTab; label: string }> = [
   { id: 'outline', label: 'Outline' },
   { id: 'files', label: 'Files' },
 ]
-
-const themeGroups: ThemeGroup[] = [
-  {
-    label: 'Light',
-    options: [
-      { value: 'github-light', label: 'GitHub Light' },
-      { value: 'pastel-mint', label: 'Lavender Frost' },
-      { value: 'minimal-ivory', label: 'Minimal Ivory' },
-    ],
-  },
-  {
-    label: 'Dark',
-    options: [
-      { value: 'github-dark', label: 'GitHub Dark' },
-      { value: 'one-dark', label: 'One Dark' },
-      { value: 'blue-eclipse', label: 'Blue Eclipse' },
-    ],
-  },
-] as const
 
 const statusLabels: Record<SaveStatus, string> = {
   'local-only': 'Local Only',
@@ -244,6 +212,7 @@ function useIsMobileViewport(): boolean {
 }
 
 export function EditorShellPage() {
+  const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorHandle | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingPreviewLineRef = useRef<number | null>(null)
@@ -321,8 +290,7 @@ export function EditorShellPage() {
   const showEditor = normalizedDesktopViewMode === 'split'
   const showPreview = normalizedDesktopViewMode === 'preview' || normalizedDesktopViewMode === 'split'
   const isLinkDialogOpen = linkDialog !== null
-  const selectedThemeLabel =
-    themeGroups.flatMap((group) => group.options).find((option) => option.value === theme)?.label ?? 'Theme'
+  const selectedThemeLabel = getSelectedThemeLabel(theme)
   const isMobileAppbarHidden = useAutoHideAppbar({
     enabled: isMobileViewport,
     resetKey: mobileTab,
@@ -560,6 +528,10 @@ export function EditorShellPage() {
 
   function guardedCreateNewDraft() {
     runGuardedDraftTransition(createNewDraft)
+  }
+
+  function guardedOpenDashboard() {
+    runGuardedDraftTransition(() => navigate('/'))
   }
 
   async function handleDeleteRecentDocument(item: RecentDocumentItem) {
@@ -844,6 +816,9 @@ export function EditorShellPage() {
           </span>
           <strong>MD Studio</strong>
         </div>
+        <button type="button" className="icon-button bordered" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
+          <Home size={18} />
+        </button>
         <input
           className="title-input"
           value={draftTitle}
@@ -926,6 +901,9 @@ export function EditorShellPage() {
       </header>
 
       <header className={isMobileAppbarHidden && !isProfileMenuOpen ? 'mobile-topbar appbar-hidden' : 'mobile-topbar'}>
+        <button type="button" className="icon-button bordered mobile-dashboard-button" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
+          <Home size={18} />
+        </button>
         <div className="mobile-title-block">
           <strong>{mobileTab === 'files' ? 'MD Studio' : draftTitle}</strong>
         </div>
@@ -1253,158 +1231,6 @@ function PanelHeader({ title }: { title: string }) {
     <div className="panel-header">
       <h2>{title}</h2>
     </div>
-  )
-}
-
-function getUserInitial(user: User): string | null {
-  const source = user.displayName || user.email
-  return source ? source.trim().charAt(0).toUpperCase() : null
-}
-
-function AccountAvatar({ user, size = 20 }: { user: User | null; size?: number }) {
-  const initial = user ? getUserInitial(user) : null
-  if (user?.photoURL) {
-    return <img src={user.photoURL} alt="" />
-  }
-  if (initial) {
-    return <span className="avatar-initial">{initial}</span>
-  }
-  return <UserCircle size={size} />
-}
-
-function AccountButton({
-  user,
-  isOpen,
-  onClick,
-}: {
-  user: User | null
-  isOpen: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      className="avatar-button"
-      onClick={onClick}
-      aria-label="Account menu"
-      aria-haspopup="menu"
-      aria-expanded={isOpen}
-    >
-      <AccountAvatar user={user} />
-    </button>
-  )
-}
-
-function AccountMenu({
-  user,
-  view,
-  theme,
-  themeGroups,
-  selectedThemeLabel,
-  isConfirmingSignOut,
-  onViewChange,
-  onSelectTheme,
-  onSignIn,
-  onRequestSignOut,
-  onCancelSignOut,
-  onConfirmSignOut,
-}: {
-  user: User | null
-  view: AccountMenuView
-  theme: ThemeName
-  themeGroups: ThemeGroup[]
-  selectedThemeLabel: string
-  isConfirmingSignOut: boolean
-  onViewChange: (view: AccountMenuView) => void
-  onSelectTheme: (theme: ThemeName) => void
-  onSignIn: () => void
-  onRequestSignOut: () => void
-  onCancelSignOut: () => void
-  onConfirmSignOut: () => void
-}) {
-  const menuRole = isConfirmingSignOut ? 'dialog' : 'menu'
-
-  return (
-    <section className="account-menu" role={menuRole} aria-label="Account">
-      {view === 'theme' ? (
-        <div className="account-menu-panel account-menu-panel-theme">
-          <button
-            type="button"
-            className="account-menu-action account-menu-back"
-            onClick={() => onViewChange('main')}
-            aria-label="Back to account menu"
-          >
-            <ArrowLeft size={16} />
-            Theme
-          </button>
-          <div className="account-menu-divider" />
-          {themeGroups.map((group) => (
-            <div key={group.label} className="account-theme-group">
-              <p className="account-theme-group-label">{group.label}</p>
-              {group.options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={option.value === theme}
-                  className={option.value === theme ? 'account-menu-action account-theme-option active' : 'account-menu-action account-theme-option'}
-                  onClick={() => onSelectTheme(option.value)}
-                >
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="account-menu-panel account-menu-panel-main">
-          {user ? (
-            <>
-              <div className="account-menu-profile">
-                <span className="account-menu-avatar" aria-hidden="true">
-                  <AccountAvatar user={user} size={28} />
-                </span>
-                <span className="account-menu-identity">
-                  <strong>{user.displayName || 'Signed in user'}</strong>
-                  <small>{user.email || 'No email available'}</small>
-                </span>
-              </div>
-              <div className="account-menu-divider" />
-            </>
-          ) : null}
-          <button type="button" className="account-menu-action account-theme-entry" onClick={() => onViewChange('theme')} role="menuitem">
-            <Moon size={16} />
-            <span>Theme</span>
-            <span className="account-menu-action-value">{selectedThemeLabel}</span>
-            <ChevronRight size={16} />
-          </button>
-          <div className="account-menu-divider" />
-          {isConfirmingSignOut ? (
-            <div className="account-confirm">
-              <strong>Sign out?</strong>
-              <div className="account-confirm-actions">
-                <button type="button" className="secondary-button compact" onClick={onCancelSignOut} aria-label="Cancel sign out">
-                  Cancel
-                </button>
-                <button type="button" className="primary-button compact" onClick={onConfirmSignOut} aria-label="Confirm sign out">
-                  Confirm
-                </button>
-              </div>
-            </div>
-          ) : user ? (
-            <button type="button" className="account-menu-action" onClick={onRequestSignOut} role="menuitem">
-              <LogOut size={16} />
-              Sign out
-            </button>
-          ) : (
-            <button type="button" className="account-menu-action" onClick={onSignIn} role="menuitem">
-              <LogIn size={16} />
-              Sign in
-            </button>
-          )}
-        </div>
-      )}
-    </section>
   )
 }
 

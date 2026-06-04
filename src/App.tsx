@@ -125,7 +125,7 @@ export function App() {
       <Route path="/open-md" element={<FileOpenPage />} />
       <Route path="/doc/:id" element={<LocalDocumentPage />} />
       <Route path="/share/:id" element={<SharePlaceholderPage />} />
-      <Route path="*" element={<Navigate to="/editor" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { DocumentList, FilesView } from './editor/EditorShellPage'
 import { useRelativeTimeNow } from './editor/useRelativeTimeNow'
-import { listenToAuthState, signOutCurrentUser } from './firebase/auth'
+import { listenToAuthState, signInWithGoogle, signOutCurrentUser } from './firebase/auth'
 import { useAppStore } from './state/useAppStore'
 import { db } from './storage/db'
 import { createDocument, setActiveDocumentId } from './storage/documents'
-import { backUpLocalDocument } from './storage/documentSync'
+import { backUpLocalDocument, refreshRecentDocumentsForUser } from './storage/documentSync'
 import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './storage/shareDocuments'
 
 const authMockState = vi.hoisted(() => ({
@@ -86,7 +86,7 @@ describe('App routing shell', () => {
     vi.mocked(updateSharedDocument).mockResolvedValue()
   })
 
-  it('redirects root to editor shell', () => {
+  it('renders the dashboard at root', () => {
     window.history.pushState({}, '', '/')
     render(
       <BrowserRouter>
@@ -94,7 +94,202 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
     expect(screen.getByText('MD Studio')).toBeInTheDocument()
-    expect(document.title).toBe('Markdown Rendering Test File | MD Studio')
+    expect(screen.getByText('Welcome!')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Write, preview, and manage Markdown documents.' })).toBeInTheDocument()
+    expect(document.title).toBe('Dashboard | MD Studio')
+  })
+
+  it('shows signed-out dashboard actions and signs in from get started', async () => {
+    window.history.pushState({}, '', '/')
+    vi.mocked(signInWithGoogle).mockResolvedValue({
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    } as never)
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Try without signing in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /New Blank Doc/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Import Markdown/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /View sample document/ })).toBeInTheDocument()
+    expect(screen.getByText('Sign in to view your saved documents.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Get started' })[0])
+
+    await waitFor(() => {
+      expect(signInWithGoogle).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('uses the shared overflow menu for signed-out dashboard theme and sign in', async () => {
+    window.history.pushState({}, '', '/')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    const topbar = document.querySelector<HTMLElement>('.dashboard-topbar')!
+
+    expect(within(topbar).queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
+    expect(within(topbar).queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'Account menu' }))
+
+    expect(screen.getByRole('menuitem', { name: /Theme/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /Theme/ }))
+    expect(screen.getByText('Light')).toBeInTheDocument()
+    expect(screen.getByText('Dark')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Blue Eclipse' }))
+
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+    })
+  })
+
+  it('uses the shared overflow menu for signed-in dashboard profile and sign out', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada Lovelace',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    const topbar = document.querySelector<HTMLElement>('.dashboard-topbar')!
+
+    expect(within(topbar).queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'Account menu' }))
+
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(screen.getByText('ada@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Theme/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
+    expect(screen.getByText('Sign out?')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sign out' }))
+    expect(screen.queryByText('Sign out?')).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    expect(signOutCurrentUser).not.toHaveBeenCalled()
+  })
+
+  it('closes and resets the dashboard overflow menu from escape and outside clicks', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada Lovelace',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    window.history.pushState({}, '', '/')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    const accountButton = document.querySelector<HTMLButtonElement>('.dashboard-topbar .avatar-button')!
+
+    fireEvent.click(accountButton)
+    fireEvent.click(screen.getByRole('menuitem', { name: /Theme/ }))
+    expect(screen.getByText('Light')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByText('Light')).not.toBeInTheDocument()
+
+    fireEvent.click(accountButton)
+    expect(screen.getByRole('menuitem', { name: /Theme/ })).toBeInTheDocument()
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('menuitem', { name: /Theme/ })).not.toBeInTheDocument()
+  })
+
+  it('opens a local blank draft from the signed-out dashboard', async () => {
+    window.history.pushState({}, '', '/')
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try without signing in' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/editor')
+    })
+    expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
+  })
+
+  it('loads signed-in dashboard recent documents and opens one in the editor', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const doc = await createDocument({ title: 'Dashboard Notes', markdown: '# Dashboard Notes' })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([
+      {
+        id: doc.id,
+        localDocumentId: doc.id,
+        title: doc.title,
+        markdown: doc.markdown,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        contentUpdatedAt: doc.contentUpdatedAt,
+        source: doc.source,
+        syncStatus: 'local-only',
+      },
+    ])
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Hi, Ada' })).toBeInTheDocument()
+    const documentButtons = await screen.findAllByRole('button', { name: /Dashboard Notes/ })
+    const documentButton = documentButtons.find((button) => button.classList.contains('dashboard-document-main'))
+    expect(documentButton).toBeDefined()
+    expect(refreshRecentDocumentsForUser).toHaveBeenCalledWith('user-1')
+
+    fireEvent.click(documentButton as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/editor')
+    })
+    expect(useAppStore.getState().activeDocId).toBe(doc.id)
+  })
+
+  it('shows signed-in dashboard empty and error states', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    vi.mocked(refreshRecentDocumentsForUser).mockRejectedValue(new Error('offline'))
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(screen.getByText('Loading documents...')).toBeInTheDocument()
+    await screen.findByText('Unable to load cloud documents. Showing local documents when available.')
+    expect(screen.getByText('No documents yet.')).toBeInTheDocument()
   })
 
   async function seedUnsavedDocumentSwitch(signedIn = false) {
@@ -758,6 +953,46 @@ describe('App routing shell', () => {
     expect(screen.getByText('Priyanshu Gaurav')).toBeInTheDocument()
   })
 
+  it('exposes dashboard navigation in the editor and guards unsaved changes', async () => {
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Unsaved Dashboard Test',
+      draftMarkdown: 'Changed',
+      lastLocalSavedTitle: 'Unsaved Dashboard Test',
+      lastLocalSavedMarkdown: 'Original',
+      saveStatus: 'unsaved',
+    })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const desktopDashboardButton = within(container.querySelector<HTMLElement>('.studio-topbar')!).getByRole('button', { name: 'Dashboard' })
+    fireEvent.click(desktopDashboardButton)
+
+    expect(screen.getByRole('dialog', { name: 'Unsaved changes' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/')
+    })
+  })
+
+  it('exposes dashboard navigation in the mobile editor topbar', () => {
+    mockMobileViewport(true)
+    useAppStore.setState({ isHydrated: true, draftTitle: 'Mobile Test', draftMarkdown: 'Body', saveStatus: 'saved' })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(within(container.querySelector<HTMLElement>('.mobile-topbar')!).getByRole('button', { name: 'Dashboard' })).toBeInTheDocument()
+  })
+
   it('hides and shows the mobile appbar from active panel scroll direction', () => {
     mockMobileViewport(true)
     useAppStore.setState({ isHydrated: true, draftTitle: 'Mobile Test', draftMarkdown: 'Body' })
@@ -1008,6 +1243,31 @@ describe('App routing shell', () => {
     expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'blue-eclipse' } })
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+  })
+
+  it('navigates from a shared document back to the dashboard', async () => {
+    window.history.pushState({}, '', '/share/public-dashboard')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-dashboard',
+      title: 'Shared Dashboard Link Test',
+      markdown: '# Shared Dashboard Link Test',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Shared Dashboard Link Test' })
+    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/')
+    })
   })
 
   it('opens shared document menu actions on mobile and switches theme', async () => {
