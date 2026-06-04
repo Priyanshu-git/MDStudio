@@ -547,19 +547,42 @@ describe('App routing shell', () => {
     expect(screen.getByRole('menuitem', { name: 'Save as PDF' })).toBeInTheDocument()
   })
 
-  it('switches theme from editor topbar', () => {
+  it('switches theme from the global overflow menu', () => {
     window.history.pushState({}, '', '/editor')
-    render(
+    const { container } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select theme' }))
+    const topbar = container.querySelector<HTMLElement>('.studio-topbar')!
+    expect(within(topbar).queryByRole('button', { name: 'Select theme' })).not.toBeInTheDocument()
+
+    fireEvent.click(topbar.querySelector<HTMLButtonElement>('.avatar-button')!)
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Theme/ }))
     expect(screen.getByText('Light')).toBeInTheDocument()
     expect(screen.getByText('Dark')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Blue Eclipse' }))
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+  })
+
+  it('uses the signed-out account icon as the global overflow menu', () => {
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const topbar = container.querySelector<HTMLElement>('.studio-topbar')!
+    expect(within(topbar).queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument()
+    expect(within(topbar).queryByRole('button', { name: 'Select theme' })).not.toBeInTheDocument()
+
+    fireEvent.click(topbar.querySelector<HTMLButtonElement>('.avatar-button')!)
+
+    expect(screen.getByRole('menuitem', { name: /Theme/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toBeInTheDocument()
   })
 
   it('opens the account menu without signing out immediately', () => {
@@ -580,6 +603,7 @@ describe('App routing shell', () => {
 
     expect(screen.getByText('Priyanshu Gaurav')).toBeInTheDocument()
     expect(screen.getByText('priyanshu.grv11@gmail.com')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Theme/ })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
     expect(signOutCurrentUser).not.toHaveBeenCalled()
     expect(listenToAuthState).toHaveBeenCalled()

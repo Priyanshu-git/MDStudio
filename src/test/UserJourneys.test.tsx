@@ -78,7 +78,8 @@ describe('User Journeys', () => {
     expect(previewButton).toHaveClass('active')
 
     // 5. Change theme
-    fireEvent.click(screen.getByRole('button', { name: 'Select theme' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Account menu' })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: /Theme/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Blue Eclipse' }))
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
 

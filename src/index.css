@@ -432,61 +432,6 @@ a {
   transform: translateY(-1px) scale(1.01);
 }
 
-.theme-menu {
-  position: relative;
-}
-
-.theme-menu-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  min-width: 210px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.theme-menu-group + .theme-menu-group {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.theme-menu-group .theme-select-group-label {
-  margin: 0;
-  padding: 4px 8px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--text) 58%, var(--surface));
-}
-
-.theme-menu-option {
-  width: 100%;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 10px 8px 16px;
-  text-align: left;
-  color: var(--text);
-  background: transparent;
-  cursor: pointer;
-}
-
-.theme-menu-option:hover,
-.theme-menu-option:focus-visible {
-  background: var(--hover-bg);
-  outline: none;
-}
-
-.theme-menu-option.active {
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-
 .primary-button,
 .secondary-button,
 .icon-button,
@@ -613,14 +558,13 @@ a {
   top: calc(100% + 10px);
   right: 0;
   z-index: 45;
-  width: min(280px, calc(100vw - 24px));
-  display: grid;
-  gap: 10px;
+  width: min(292px, calc(100vw - 24px));
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .account-menu::before {
@@ -642,6 +586,7 @@ a {
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+  padding: 2px 4px;
 }
 
 .account-menu-avatar {
@@ -686,6 +631,16 @@ a {
   background: var(--border);
 }
 
+.account-menu-panel {
+  display: grid;
+  gap: 10px;
+  animation: account-menu-panel-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.account-menu-panel-theme {
+  animation-name: account-menu-theme-in;
+}
+
 .account-menu-action {
   min-height: 40px;
   display: inline-flex;
@@ -701,8 +656,67 @@ a {
   font-weight: 600;
 }
 
-.account-menu-action:hover {
+.account-menu-action:hover,
+.account-menu-action:focus-visible {
   background: var(--hover-bg);
+  outline: none;
+}
+
+.account-theme-entry {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+.account-menu-action-value {
+  min-width: 0;
+  justify-self: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.account-menu-back {
+  justify-content: flex-start;
+  background: transparent;
+}
+
+.account-theme-group {
+  display: grid;
+  gap: 4px;
+}
+
+.account-theme-group + .account-theme-group {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.account-theme-group-label {
+  margin: 0;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.account-theme-option {
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+}
+
+.account-theme-option.active {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.account-theme-option.active:hover,
+.account-theme-option.active:focus-visible {
+  background: var(--accent-strong);
 }
 
 .account-confirm {
@@ -714,6 +728,28 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+@keyframes account-menu-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes account-menu-theme-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .save-split-menu {

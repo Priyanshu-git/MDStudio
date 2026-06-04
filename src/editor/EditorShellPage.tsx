@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import type { FormEvent } from 'react'
 import type { User } from 'firebase/auth'
 import {
+  ArrowLeft,
   Bold,
   BookOpen,
   CheckSquare,
@@ -13,6 +14,7 @@ import {
   GitBranch,
   Cloud,
   ChevronDown,
+  ChevronRight,
   Heading1,
   Heading2,
   HardDrive,
@@ -24,6 +26,7 @@ import {
   LogIn,
   LogOut,
   Minus,
+  Moon,
   Plus,
   Quote,
   Redo2,
@@ -63,6 +66,8 @@ type ToolbarItem = {
 }
 
 type DesktopSidebarTab = 'documents' | 'outline'
+
+type AccountMenuView = 'main' | 'theme'
 
 type LinkDialogState = {
   mode: 'link' | 'image'
@@ -245,7 +250,6 @@ export function EditorShellPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
-  const themeMenuRef = useRef<HTMLDivElement | null>(null)
   const saveMenuRef = useRef<HTMLDivElement | null>(null)
   const mobilePanelRef = useRef<HTMLElement | null>(null)
   const linkTextInputRef = useRef<HTMLInputElement | null>(null)
@@ -258,13 +262,13 @@ export function EditorShellPage() {
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isInsertOpen, setIsInsertOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [accountMenuView, setAccountMenuView] = useState<AccountMenuView>('main')
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [fileSearch, setFileSearch] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
   const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('outline')
-  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
   const [pendingDraftTransition, setPendingDraftTransition] = useState<PendingDraftTransition | null>(null)
   const [isResolvingDraftTransition, setIsResolvingDraftTransition] = useState(false)
@@ -354,6 +358,7 @@ export function EditorShellPage() {
     setUser(nextUser)
     if (!nextUser) {
       setIsProfileMenuOpen(false)
+      setAccountMenuView('main')
       setIsConfirmingSignOut(false)
       clearRecentDocumentsForSignedOut()
       return
@@ -370,6 +375,7 @@ export function EditorShellPage() {
 
     function closeProfileMenu() {
       setIsProfileMenuOpen(false)
+      setAccountMenuView('main')
       setIsConfirmingSignOut(false)
     }
 
@@ -394,37 +400,6 @@ export function EditorShellPage() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isProfileMenuOpen])
-
-  useEffect(() => {
-    if (!isThemeMenuOpen) {
-      return
-    }
-
-    function closeThemeMenu() {
-      setIsThemeMenuOpen(false)
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node
-      if (themeMenuRef.current?.contains(target)) {
-        return
-      }
-      closeThemeMenu()
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        closeThemeMenu()
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isThemeMenuOpen])
 
   useEffect(() => {
     if (!isSaveMenuOpen) {
@@ -759,6 +734,8 @@ export function EditorShellPage() {
   }
 
   async function handleSignIn() {
+    setIsProfileMenuOpen(false)
+    setAccountMenuView('main')
     setAuthError(null)
     try {
       const signedInUser = await signInWithGoogle()
@@ -770,7 +747,12 @@ export function EditorShellPage() {
   }
 
   function toggleProfileMenu() {
-    setIsProfileMenuOpen((isOpen) => !isOpen)
+    setIsProfileMenuOpen((isOpen) => {
+      if (isOpen) {
+        setAccountMenuView('main')
+      }
+      return !isOpen
+    })
     setIsConfirmingSignOut(false)
   }
 
@@ -778,6 +760,7 @@ export function EditorShellPage() {
     const didSignOut = await handleSignOut()
     if (didSignOut) {
       setIsProfileMenuOpen(false)
+      setAccountMenuView('main')
       setIsConfirmingSignOut(false)
     }
   }
@@ -910,66 +893,36 @@ export function EditorShellPage() {
             </div>
           ) : null}
         </div>
-        <div className="theme-menu" ref={themeMenuRef}>
-          <button
-            type="button"
-            className="theme-select"
-            aria-haspopup="menu"
-            aria-expanded={isThemeMenuOpen}
-            aria-label="Select theme"
-            onClick={() => setIsThemeMenuOpen((open) => !open)}
-          >
-            <span>{selectedThemeLabel}</span>
-            <ChevronDown size={16} />
-          </button>
-          {isThemeMenuOpen ? (
-            <section className="theme-menu-popover" role="menu" aria-label="Theme options">
-              {themeGroups.map((group) => (
-                <div key={group.label} className="theme-menu-group">
-                  <p className="theme-select-group-label">{group.label}</p>
-                  {group.options.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={option.value === theme}
-                      className={option.value === theme ? 'theme-menu-option active' : 'theme-menu-option'}
-                      onClick={() => {
-                        setTheme(option.value)
-                        setIsThemeMenuOpen(false)
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </section>
-          ) : null}
-        </div>
         <button type="button" className="secondary-button" onClick={() => setIsShareOpen(true)}>
           <Share2 size={16} />
           Share
         </button>
-        {user ? (
-          <div className="account-menu-anchor" ref={desktopAccountRef}>
-            <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
-            {!isMobileViewport && isProfileMenuOpen ? (
-              <AccountMenu
-                user={user}
-                isConfirmingSignOut={isConfirmingSignOut}
-                onRequestSignOut={() => setIsConfirmingSignOut(true)}
-                onCancelSignOut={() => setIsConfirmingSignOut(false)}
-                onConfirmSignOut={() => void handleConfirmedSignOut()}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <button type="button" className="secondary-button compact" onClick={() => void handleSignIn()}>
-            <LogIn size={16} />
-            Sign in
-          </button>
-        )}
+        <div className="account-menu-anchor" ref={desktopAccountRef}>
+          <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
+          {!isMobileViewport && isProfileMenuOpen ? (
+            <AccountMenu
+              user={user}
+              view={accountMenuView}
+              theme={theme}
+              themeGroups={themeGroups}
+              selectedThemeLabel={selectedThemeLabel}
+              isConfirmingSignOut={isConfirmingSignOut}
+              onViewChange={setAccountMenuView}
+              onSelectTheme={(nextTheme) => {
+                setTheme(nextTheme)
+                setIsProfileMenuOpen(false)
+                setAccountMenuView('main')
+              }}
+              onSignIn={() => void handleSignIn()}
+              onRequestSignOut={() => {
+                setAccountMenuView('main')
+                setIsConfirmingSignOut(true)
+              }}
+              onCancelSignOut={() => setIsConfirmingSignOut(false)}
+              onConfirmSignOut={() => void handleConfirmedSignOut()}
+            />
+          ) : null}
+        </div>
       </header>
 
       <header className={isMobileAppbarHidden && !isProfileMenuOpen ? 'mobile-topbar appbar-hidden' : 'mobile-topbar'}>
@@ -977,24 +930,32 @@ export function EditorShellPage() {
           <strong>{mobileTab === 'files' ? 'MD Studio' : draftTitle}</strong>
         </div>
         <span className={`save-badge save-badge-${saveStatus}`}>{statusLabels[saveStatus]}</span>
-        {user ? (
-          <div className="account-menu-anchor mobile-account-anchor" ref={mobileAccountRef}>
-            <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
-            {isMobileViewport && isProfileMenuOpen ? (
-              <AccountMenu
-                user={user}
-                isConfirmingSignOut={isConfirmingSignOut}
-                onRequestSignOut={() => setIsConfirmingSignOut(true)}
-                onCancelSignOut={() => setIsConfirmingSignOut(false)}
-                onConfirmSignOut={() => void handleConfirmedSignOut()}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <button type="button" className="icon-button" onClick={() => void handleSignIn()} aria-label="Sign in">
-            <LogIn size={20} />
-          </button>
-        )}
+        <div className="account-menu-anchor mobile-account-anchor" ref={mobileAccountRef}>
+          <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />
+          {isMobileViewport && isProfileMenuOpen ? (
+            <AccountMenu
+              user={user}
+              view={accountMenuView}
+              theme={theme}
+              themeGroups={themeGroups}
+              selectedThemeLabel={selectedThemeLabel}
+              isConfirmingSignOut={isConfirmingSignOut}
+              onViewChange={setAccountMenuView}
+              onSelectTheme={(nextTheme) => {
+                setTheme(nextTheme)
+                setIsProfileMenuOpen(false)
+                setAccountMenuView('main')
+              }}
+              onSignIn={() => void handleSignIn()}
+              onRequestSignOut={() => {
+                setAccountMenuView('main')
+                setIsConfirmingSignOut(true)
+              }}
+              onCancelSignOut={() => setIsConfirmingSignOut(false)}
+              onConfirmSignOut={() => void handleConfirmedSignOut()}
+            />
+          ) : null}
+        </div>
       </header>
       <nav className="mobile-mode-tabs" aria-label="Mobile mode">
         {mobileTabs.map((tab) => (
@@ -1300,9 +1261,9 @@ function getUserInitial(user: User): string | null {
   return source ? source.trim().charAt(0).toUpperCase() : null
 }
 
-function AccountAvatar({ user, size = 20 }: { user: User; size?: number }) {
-  const initial = getUserInitial(user)
-  if (user.photoURL) {
+function AccountAvatar({ user, size = 20 }: { user: User | null; size?: number }) {
+  const initial = user ? getUserInitial(user) : null
+  if (user?.photoURL) {
     return <img src={user.photoURL} alt="" />
   }
   if (initial) {
@@ -1316,7 +1277,7 @@ function AccountButton({
   isOpen,
   onClick,
 }: {
-  user: User
+  user: User | null
   isOpen: boolean
   onClick: () => void
 }) {
@@ -1336,46 +1297,112 @@ function AccountButton({
 
 function AccountMenu({
   user,
+  view,
+  theme,
+  themeGroups,
+  selectedThemeLabel,
   isConfirmingSignOut,
+  onViewChange,
+  onSelectTheme,
+  onSignIn,
   onRequestSignOut,
   onCancelSignOut,
   onConfirmSignOut,
 }: {
-  user: User
+  user: User | null
+  view: AccountMenuView
+  theme: ThemeName
+  themeGroups: ThemeGroup[]
+  selectedThemeLabel: string
   isConfirmingSignOut: boolean
+  onViewChange: (view: AccountMenuView) => void
+  onSelectTheme: (theme: ThemeName) => void
+  onSignIn: () => void
   onRequestSignOut: () => void
   onCancelSignOut: () => void
   onConfirmSignOut: () => void
 }) {
+  const menuRole = isConfirmingSignOut ? 'dialog' : 'menu'
+
   return (
-    <section className="account-menu" role={isConfirmingSignOut ? 'dialog' : 'menu'} aria-label="Account">
-      <div className="account-menu-profile">
-        <span className="account-menu-avatar" aria-hidden="true">
-          <AccountAvatar user={user} size={28} />
-        </span>
-        <span className="account-menu-identity">
-          <strong>{user.displayName || 'Signed in user'}</strong>
-          <small>{user.email || 'No email available'}</small>
-        </span>
-      </div>
-      <div className="account-menu-divider" />
-      {isConfirmingSignOut ? (
-        <div className="account-confirm">
-          <strong>Sign out?</strong>
-          <div className="account-confirm-actions">
-            <button type="button" className="secondary-button compact" onClick={onCancelSignOut} aria-label="Cancel sign out">
-              Cancel
-            </button>
-            <button type="button" className="primary-button compact" onClick={onConfirmSignOut} aria-label="Confirm sign out">
-              Confirm
-            </button>
-          </div>
+    <section className="account-menu" role={menuRole} aria-label="Account">
+      {view === 'theme' ? (
+        <div className="account-menu-panel account-menu-panel-theme">
+          <button
+            type="button"
+            className="account-menu-action account-menu-back"
+            onClick={() => onViewChange('main')}
+            aria-label="Back to account menu"
+          >
+            <ArrowLeft size={16} />
+            Theme
+          </button>
+          <div className="account-menu-divider" />
+          {themeGroups.map((group) => (
+            <div key={group.label} className="account-theme-group">
+              <p className="account-theme-group-label">{group.label}</p>
+              {group.options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={option.value === theme}
+                  className={option.value === theme ? 'account-menu-action account-theme-option active' : 'account-menu-action account-theme-option'}
+                  onClick={() => onSelectTheme(option.value)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          ))}
         </div>
       ) : (
-        <button type="button" className="account-menu-action" onClick={onRequestSignOut} role="menuitem">
-          <LogOut size={16} />
-          Sign out
-        </button>
+        <div className="account-menu-panel account-menu-panel-main">
+          {user ? (
+            <>
+              <div className="account-menu-profile">
+                <span className="account-menu-avatar" aria-hidden="true">
+                  <AccountAvatar user={user} size={28} />
+                </span>
+                <span className="account-menu-identity">
+                  <strong>{user.displayName || 'Signed in user'}</strong>
+                  <small>{user.email || 'No email available'}</small>
+                </span>
+              </div>
+              <div className="account-menu-divider" />
+            </>
+          ) : null}
+          <button type="button" className="account-menu-action account-theme-entry" onClick={() => onViewChange('theme')} role="menuitem">
+            <Moon size={16} />
+            <span>Theme</span>
+            <span className="account-menu-action-value">{selectedThemeLabel}</span>
+            <ChevronRight size={16} />
+          </button>
+          <div className="account-menu-divider" />
+          {isConfirmingSignOut ? (
+            <div className="account-confirm">
+              <strong>Sign out?</strong>
+              <div className="account-confirm-actions">
+                <button type="button" className="secondary-button compact" onClick={onCancelSignOut} aria-label="Cancel sign out">
+                  Cancel
+                </button>
+                <button type="button" className="primary-button compact" onClick={onConfirmSignOut} aria-label="Confirm sign out">
+                  Confirm
+                </button>
+              </div>
+            </div>
+          ) : user ? (
+            <button type="button" className="account-menu-action" onClick={onRequestSignOut} role="menuitem">
+              <LogOut size={16} />
+              Sign out
+            </button>
+          ) : (
+            <button type="button" className="account-menu-action" onClick={onSignIn} role="menuitem">
+              <LogIn size={16} />
+              Sign in
+            </button>
+          )}
+        </div>
       )}
     </section>
   )
