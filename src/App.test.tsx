@@ -132,8 +132,10 @@ describe('App routing shell', () => {
         <App />
       </BrowserRouter>,
     )
+    await act(async () => {})
     useAppStore.setState({ recentDocumentsState: 'ready', recentDocuments })
     fireEvent.click(screen.getByRole('button', { name: 'Documents' }))
+    useAppStore.setState({ recentDocumentsState: 'ready', recentDocuments })
     const otherDocButtons = await screen.findAllByRole('button', { name: /Other Doc/ })
     const otherDocOpenButton = otherDocButtons.find((button) => button.classList.contains('document-row-main'))
     expect(otherDocOpenButton).toBeDefined()
@@ -216,7 +218,7 @@ describe('App routing shell', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Markdown Rendering Test File' })).toBeInTheDocument()
   })
 
-  it('does not expose focus view mode', () => {
+  it('only exposes split and preview desktop view modes', () => {
     window.history.pushState({}, '', '/editor')
     render(
       <BrowserRouter>
@@ -225,6 +227,9 @@ describe('App routing shell', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Focus' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Split' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Preview' })[0]).toBeInTheDocument()
   })
 
   it('defaults to outline and switches desktop sidebar to documents', () => {
@@ -497,21 +502,49 @@ describe('App routing shell', () => {
     })
   })
 
-  it('keeps edit mode active when selecting an outline item from edit mode', async () => {
+  it('shows new as the primary topbar action and creates a fresh draft', () => {
     window.history.pushState({}, '', '/editor')
-    render(
+    useAppStore.setState({ saveStatus: 'saved' })
+    const { container } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
-    fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
+    const topbar = container.querySelector<HTMLElement>('.studio-topbar')!
+    const newButton = within(topbar).getByRole('button', { name: 'New' })
+    expect(newButton).toHaveClass('primary-button')
 
+    fireEvent.click(newButton)
+
+    expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
+    expect(useAppStore.getState().draftMarkdown).toBe('# Untitled Document\n\n')
+    expect(useAppStore.getState().desktopViewMode).toBe('split')
+  })
+
+  it('uses a secondary save button with save-as options instead of standalone export', async () => {
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const topbar = container.querySelector<HTMLElement>('.studio-topbar')!
+    const saveButton = within(topbar).getByRole('button', { name: 'Save' })
+    expect(saveButton).toHaveClass('secondary-button')
+    expect(saveButton).not.toHaveClass('primary-button')
+    expect(within(topbar).queryByRole('button', { name: 'Export' })).not.toBeInTheDocument()
+
+    fireEvent.click(saveButton)
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: 'Edit' })[0]).toHaveClass('active')
-      expect(HTMLElement.prototype.scrollTo).not.toHaveBeenCalled()
+      expect(useAppStore.getState().activeDocId).not.toBeNull()
     })
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'Save options' }))
+    expect(screen.getByRole('menuitem', { name: 'Save as HTML' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Save as MD' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Save as PDF' })).toBeInTheDocument()
   })
 
   it('switches theme from editor topbar', () => {

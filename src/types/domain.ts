@@ -77,7 +77,7 @@ export type OwnerProfile = {
   email?: string | null
 }
 
-export type DesktopViewMode = 'edit' | 'split' | 'preview'
+export type DesktopViewMode = 'split' | 'preview'
 
 export type MobileTab = 'write' | 'preview' | 'outline' | 'files'
 

@@ -7,7 +7,6 @@ import {
   CheckSquare,
   Code,
   Copy,
-  Download,
   Edit3,
   Eye,
   FileText,
@@ -247,6 +246,7 @@ export function EditorShellPage() {
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
   const themeMenuRef = useRef<HTMLDivElement | null>(null)
+  const saveMenuRef = useRef<HTMLDivElement | null>(null)
   const mobilePanelRef = useRef<HTMLElement | null>(null)
   const linkTextInputRef = useRef<HTMLInputElement | null>(null)
   const [pendingInsertAction, setPendingInsertAction] = useState<MarkdownInsertAction | null>(null)
@@ -265,6 +265,7 @@ export function EditorShellPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('outline')
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
+  const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
   const [pendingDraftTransition, setPendingDraftTransition] = useState<PendingDraftTransition | null>(null)
   const [isResolvingDraftTransition, setIsResolvingDraftTransition] = useState(false)
 
@@ -312,8 +313,9 @@ export function EditorShellPage() {
   const isMobileViewport = useIsMobileViewport()
   const relativeTimeNow = useRelativeTimeNow()
   const showSidebar = true
-  const showEditor = desktopViewMode === 'edit' || desktopViewMode === 'split'
-  const showPreview = desktopViewMode === 'preview' || desktopViewMode === 'split'
+  const normalizedDesktopViewMode: DesktopViewMode = desktopViewMode === 'preview' ? 'preview' : 'split'
+  const showEditor = normalizedDesktopViewMode === 'split'
+  const showPreview = normalizedDesktopViewMode === 'preview' || normalizedDesktopViewMode === 'split'
   const isLinkDialogOpen = linkDialog !== null
   const selectedThemeLabel =
     themeGroups.flatMap((group) => group.options).find((option) => option.value === theme)?.label ?? 'Theme'
@@ -341,6 +343,12 @@ export function EditorShellPage() {
   useEffect(() => {
     document.title = formatPageTitle(draftTitle)
   }, [draftTitle])
+
+  useEffect(() => {
+    if (desktopViewMode !== normalizedDesktopViewMode) {
+      setDesktopViewMode(normalizedDesktopViewMode)
+    }
+  }, [desktopViewMode, normalizedDesktopViewMode, setDesktopViewMode])
 
   useEffect(() => listenToAuthState((nextUser) => {
     setUser(nextUser)
@@ -417,6 +425,37 @@ export function EditorShellPage() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isThemeMenuOpen])
+
+  useEffect(() => {
+    if (!isSaveMenuOpen) {
+      return
+    }
+
+    function closeSaveMenu() {
+      setIsSaveMenuOpen(false)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (saveMenuRef.current?.contains(target)) {
+        return
+      }
+      closeSaveMenu()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeSaveMenu()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isSaveMenuOpen])
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -800,8 +839,13 @@ export function EditorShellPage() {
     window.print()
   }
 
+  function handleSaveMenuExport(format: 'md' | 'html' | 'pdf') {
+    setIsSaveMenuOpen(false)
+    handleExport(format)
+  }
+
   return (
-    <main className={`studio-shell studio-mode-${desktopViewMode}`}>
+    <main className={`studio-shell studio-mode-${normalizedDesktopViewMode}`}>
       <input
         ref={importInputRef}
         className="visually-hidden"
@@ -827,11 +871,11 @@ export function EditorShellPage() {
           {statusLabels[saveStatus]}
         </span>
         <nav className="view-switch" aria-label="View mode">
-          {(['edit', 'split', 'preview'] as DesktopViewMode[]).map((mode) => (
+          {(['split', 'preview'] as DesktopViewMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
-              className={desktopViewMode === mode ? 'view-switch-button active' : 'view-switch-button'}
+              className={normalizedDesktopViewMode === mode ? 'view-switch-button active' : 'view-switch-button'}
               onClick={() => setDesktopViewMode(mode)}
             >
               {mode[0].toUpperCase() + mode.slice(1)}
@@ -839,10 +883,33 @@ export function EditorShellPage() {
           ))}
         </nav>
         <div className="topbar-spacer" />
-        <button type="button" className="primary-button" onClick={() => void handleSave()} disabled={saveStatus === 'saving'}>
-          <Save size={16} />
-          Save
+        <button type="button" className="primary-button" onClick={guardedCreateNewDraft}>
+          <Plus size={16} />
+          New
         </button>
+        <div className="save-split-menu" ref={saveMenuRef}>
+          <button type="button" className="secondary-button save-split-primary" onClick={() => void handleSave()} disabled={saveStatus === 'saving'}>
+            <Save size={16} />
+            Save
+          </button>
+          <button
+            type="button"
+            className="secondary-button save-split-toggle"
+            aria-label="Save options"
+            aria-haspopup="menu"
+            aria-expanded={isSaveMenuOpen}
+            onClick={() => setIsSaveMenuOpen((open) => !open)}
+          >
+            <ChevronDown size={16} />
+          </button>
+          {isSaveMenuOpen ? (
+            <div className="save-export-popover" role="menu" aria-label="Save export options">
+              <button type="button" role="menuitem" onClick={() => handleSaveMenuExport('html')}>Save as HTML</button>
+              <button type="button" role="menuitem" onClick={() => handleSaveMenuExport('md')}>Save as MD</button>
+              <button type="button" role="menuitem" onClick={() => handleSaveMenuExport('pdf')}>Save as PDF</button>
+            </div>
+          ) : null}
+        </div>
         <div className="theme-menu" ref={themeMenuRef}>
           <button
             type="button"
@@ -884,17 +951,6 @@ export function EditorShellPage() {
           <Share2 size={16} />
           Share
         </button>
-        <div className="export-menu">
-          <button type="button" className="secondary-button">
-            <Download size={16} />
-            Export
-          </button>
-          <div className="export-popover">
-            <button type="button" onClick={() => handleExport('md')}>Markdown</button>
-            <button type="button" onClick={() => handleExport('html')}>HTML</button>
-            <button type="button" onClick={() => handleExport('pdf')}>PDF</button>
-          </div>
-        </div>
         {user ? (
           <div className="account-menu-anchor" ref={desktopAccountRef}>
             <AccountButton user={user} isOpen={isProfileMenuOpen} onClick={toggleProfileMenu} />

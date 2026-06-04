@@ -378,7 +378,7 @@ a {
 
 .view-switch {
   display: inline-grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  grid-template-columns: repeat(2, minmax(84px, 1fr));
   border: 1px solid var(--border);
   border-radius: 999px;
   overflow: hidden;
@@ -541,6 +541,15 @@ a {
 .bottom-action:hover,
 .insert-action:hover {
   background: var(--hover-bg);
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.secondary-button:disabled:hover {
+  background: var(--surface);
 }
 
 .compact {
@@ -707,16 +716,39 @@ a {
   gap: 8px;
 }
 
-.export-menu {
+.save-split-menu {
   position: relative;
+  display: inline-flex;
+  align-items: stretch;
 }
 
-.export-popover {
+.save-split-menu .secondary-button {
+  border-radius: 0;
+}
+
+.save-split-menu .secondary-button:hover {
+  z-index: 1;
+}
+
+.save-split-primary {
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  border-right-color: transparent;
+}
+
+.save-split-toggle {
+  width: 40px;
+  padding-inline: 0;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+}
+
+.save-export-popover {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  min-width: 150px;
-  display: none;
+  min-width: 180px;
+  display: grid;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -725,12 +757,7 @@ a {
   z-index: 30;
 }
 
-.export-menu:hover .export-popover,
-.export-menu:focus-within .export-popover {
-  display: grid;
-}
-
-.export-popover button {
+.save-export-popover button {
   border: 0;
   border-radius: 6px;
   padding: 10px;
@@ -739,7 +766,7 @@ a {
   cursor: pointer;
 }
 
-.export-popover button:hover {
+.save-export-popover button:hover {
   background: var(--surface-soft);
 }
 
@@ -938,7 +965,6 @@ a {
   padding: 8px;
 }
 
-.studio-mode-edit .desktop-main-panels,
 .studio-mode-preview .desktop-main-panels {
   grid-template-columns: minmax(0, 1fr);
 }
