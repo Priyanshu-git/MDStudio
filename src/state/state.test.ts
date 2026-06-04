@@ -14,7 +14,7 @@ describe('App Store (Zustand)', () => {
       isHydrated: false,
       draftTitle: 'Markdown Rendering Test File',
       draftMarkdown: '# Markdown Rendering Test File',
-      theme: 'github-light',
+      theme: 'minimal-ivory',
       mobileTab: 'write',
       desktopViewMode: 'split',
       saveStatus: 'local-only',
@@ -31,6 +31,7 @@ describe('App Store (Zustand)', () => {
     expect(useAppStore.getState().isHydrated).toBe(true)
     expect(useAppStore.getState().activeDocId).toBeDefined()
     expect(useAppStore.getState().draftMarkdown).toContain('Markdown Rendering Test File')
+    expect(useAppStore.getState().theme).toBe('minimal-ivory')
   })
 
   it('updates draft and saves only when requested', async () => {

@@ -42,7 +42,7 @@ describe('User Journeys', () => {
       lastCloudSavedTitle: null,
       lastCloudSavedMarkdown: null,
       isHydrated: false,
-      theme: 'github-light',
+      theme: 'minimal-ivory',
       mobileTab: 'write',
       desktopViewMode: 'split',
       saveStatus: 'local-only',
