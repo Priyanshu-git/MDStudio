@@ -99,6 +99,39 @@ describe('App routing shell', () => {
     expect(document.title).toBe('Dashboard | MD Studio')
   })
 
+  it('shows only the first-landing loader until dashboard auth resolves', async () => {
+    let authCallback: ((user: unknown) => void) | null = null
+    vi.mocked(listenToAuthState).mockImplementationOnce((callback: (user: unknown) => void) => {
+      authCallback = callback
+      return vi.fn()
+    })
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(screen.getByRole('status', { name: 'Loading dashboard' })).toBeInTheDocument()
+    expect(screen.queryByText('MD Studio')).not.toBeInTheDocument()
+    expect(screen.queryByText('Welcome!')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Get started' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try without signing in' })).not.toBeInTheDocument()
+
+    await act(async () => {
+      authCallback?.({
+        uid: 'user-1',
+        displayName: 'Ada Lovelace',
+        email: 'ada@example.com',
+        photoURL: null,
+      })
+    })
+
+    expect(await screen.findByRole('heading', { name: 'Hi, Ada' })).toBeInTheDocument()
+    expect(screen.queryByText('Welcome!')).not.toBeInTheDocument()
+  })
+
   it('shows signed-out dashboard actions and signs in from get started', async () => {
     window.history.pushState({}, '', '/')
     vi.mocked(signInWithGoogle).mockResolvedValue({
@@ -496,6 +529,42 @@ describe('App routing shell', () => {
     expect(useAppStore.getState().draftTitle).toBe('explorer-file')
     expect(useAppStore.getState().draftMarkdown).toBe('# Explorer File\n\nOpened from Windows.')
     expect(screen.getByRole('heading', { level: 1, name: 'Explorer File' })).toBeInTheDocument()
+  })
+
+  it('opens the dashboard when the PWA launches without a file', async () => {
+    let consumer: ((launchParams: LaunchParams) => void) | null = null
+    class MockLaunchParams {
+      files: FileSystemFileHandle[] = []
+    }
+    MockLaunchParams.prototype.files = []
+    Object.defineProperty(window, 'LaunchParams', {
+      configurable: true,
+      value: MockLaunchParams,
+    })
+    Object.defineProperty(window, 'launchQueue', {
+      configurable: true,
+      value: {
+        setConsumer: vi.fn((nextConsumer: (launchParams: LaunchParams) => void) => {
+          consumer = nextConsumer
+        }),
+      },
+    })
+    window.history.pushState({}, '', '/open-md')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await act(async () => {
+      consumer?.({ files: [] })
+    })
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/')
+    })
+    expect(screen.getByText('Welcome!')).toBeInTheDocument()
   })
 
   it('falls back to manual import when File Handling API is unavailable', () => {

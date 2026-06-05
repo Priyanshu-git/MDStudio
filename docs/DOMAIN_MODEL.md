@@ -107,7 +107,7 @@ type OwnerProfile = {
 ## View State Types
 
 ```ts
-type DesktopViewMode = "edit" | "split" | "preview";
+type DesktopViewMode = "split" | "preview";
 type MobileTab = "write" | "preview" | "outline" | "files";
 ```
 

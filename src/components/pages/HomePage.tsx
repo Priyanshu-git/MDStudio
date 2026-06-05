@@ -22,6 +22,8 @@ import { useAppStore } from '../../state/useAppStore'
 import { deleteRecentDocument } from '../../storage/documentSync'
 import type { RecentDocumentItem, RecentDocumentsState } from '../../types'
 
+type DashboardAuthStatus = 'loading' | 'signed-in' | 'signed-out'
+
 function formatRelativeTime(timestamp: number, now = Date.now()): string {
   const diffMs = Math.max(0, now - timestamp)
   const minute = 60 * 1000
@@ -59,6 +61,8 @@ export function HomePage() {
   const accountRef = useRef<HTMLDivElement | null>(null)
   const newMenuRef = useRef<HTMLDivElement | null>(null)
   const [user, setUser] = useState<User | null>(null)
+  const [authStatus, setAuthStatus] = useState<DashboardAuthStatus>('loading')
+  const [isLoaderVisible, setIsLoaderVisible] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -95,6 +99,7 @@ export function HomePage() {
 
   useEffect(() => listenToAuthState((nextUser) => {
     setUser(nextUser)
+    setAuthStatus(nextUser ? 'signed-in' : 'signed-out')
     setIsAccountMenuOpen(false)
     setAccountMenuView('main')
     setIsConfirmingSignOut(false)
@@ -106,6 +111,17 @@ export function HomePage() {
       setAuthError('Unable to load backed up documents.')
     })
   }), [clearRecentDocumentsForSignedOut, refreshRecentDocuments])
+
+  useEffect(() => {
+    if (authStatus === 'loading') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsLoaderVisible(false)
+    }, 260)
+    return () => window.clearTimeout(timeoutId)
+  }, [authStatus])
 
   useEffect(() => {
     if (!isAccountMenuOpen) {
@@ -294,8 +310,15 @@ export function HomePage() {
     }
   }
 
+  const signedInUser = authStatus === 'signed-in' ? user : null
+
+  if (authStatus === 'loading') {
+    return <MDPulseLoader />
+  }
+
   return (
     <main className="dashboard-shell">
+      {isLoaderVisible ? <MDPulseLoader isLeaving /> : null}
       <header className="dashboard-topbar">
         <div className="brand-lockup">
           <span className="app-mark" aria-hidden="true">
@@ -304,7 +327,7 @@ export function HomePage() {
           <strong>MD Studio</strong>
         </div>
 
-        {user ? (
+        {signedInUser ? (
           <label className="dashboard-search">
             <Search size={19} />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search documents..." />
@@ -313,7 +336,7 @@ export function HomePage() {
           <div className="dashboard-topbar-spacer" />
         )}
 
-        {user ? (
+        {signedInUser ? (
           <>
             <div className="dashboard-new-menu" ref={newMenuRef}>
               <button type="button" className="primary-button dashboard-new-primary" onClick={handleNewDocument}>
@@ -400,10 +423,10 @@ export function HomePage() {
       {importError ? <div className="studio-banner error">{importError}</div> : null}
       <input ref={importInputRef} className="visually-hidden" type="file" accept=".md,text/markdown" onChange={handleImportFile} />
 
-      {user ? (
+      {signedInUser ? (
         <section className="dashboard-content">
           <div className="dashboard-heading">
-            <h1>Hi, {getUserFirstName(user)}</h1>
+            <h1>Hi, {getUserFirstName(signedInUser)}</h1>
             <p>Create and continue your documents.</p>
           </div>
 
@@ -488,6 +511,16 @@ export function HomePage() {
         </section>
       )}
     </main>
+  )
+}
+
+function MDPulseLoader({ isLeaving = false }: { isLeaving?: boolean }) {
+  return (
+    <div className={isLeaving ? 'md-pulse-loader leaving' : 'md-pulse-loader'} role="status" aria-label="Loading dashboard">
+      <div className="md-pulse-loader-mark" aria-hidden="true">
+        <span>MD</span>
+      </div>
+    </div>
   )
 }
 

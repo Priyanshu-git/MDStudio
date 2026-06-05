@@ -15,7 +15,6 @@
 - `/` redirects to `/editor`
 - `/editor` editor and preview shell:
   - desktop view modes:
-  - `edit`: editor-only desktop surface
   - `split`: editor and preview desktop surface
   - `preview`: preview-only desktop surface
   - mobile tabs:
@@ -57,7 +56,7 @@ For end-to-end product behavior, keep `docs/USER_FLOWS.md` aligned with route, p
 
 ## UI Mode State
 
-- `desktopViewMode: 'edit' | 'split' | 'preview'` is owned by app state.
+- `desktopViewMode: 'split' | 'preview'` is owned by app state.
 - `mobileTab: 'write' | 'preview' | 'outline' | 'files'` is owned by app state.
 - `desktopSidebarTab: 'documents' | 'outline'` is local editor-shell UI state and defaults to `outline`.
 - Recent Documents relative-time rendering uses local editor-shell timer state and is not persisted.

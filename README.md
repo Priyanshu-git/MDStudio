@@ -20,13 +20,14 @@ Open the app at the local Vite URL (default `http://localhost:5173`).
 - `npm run typecheck` - run TypeScript checks
 - `npm run test` - run Vitest in CI mode
 - `npm run test:watch` - run Vitest watch mode
+- `npm run cleanup:deleted-cloud-docs` - dry-run cleanup for legacy deleted private cloud documents
 - `npm run format` - check formatting with Prettier
 - `npm run format:write` - apply formatting with Prettier
 
 ## What Works Today
 
 - Local document editing with dirty-state tracking, manual save, recent documents, and IndexedDB persistence.
-- Desktop edit, split, and preview modes.
+- Desktop split and preview modes.
 - Desktop document/outline sidebar with heading navigation.
 - Mobile write, preview, outline, and files tabs.
 - Markdown insert toolbar for headings, links, images by URL, tables, code, math, Mermaid, lists, quotes, and rules.

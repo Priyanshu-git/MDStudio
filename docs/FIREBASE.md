@@ -54,6 +54,18 @@ Collection path: `users/{uid}/documents/{documentId}`
 Only the authenticated owner can read or write these documents.
 Deleting a private backup hard-deletes the document from this collection. Older records with `deletedAt` are legacy tombstones and are ignored by the app.
 
+## Legacy Deleted Document Cleanup
+
+`npm run cleanup:deleted-cloud-docs` scans private `users/{uid}/documents` subcollections for legacy records where `deletedAt > 0`. The default run is a dry run that prints matched paths, titles, and owners without deleting anything.
+
+To delete the matched legacy tombstones, run:
+
+```bash
+npm run cleanup:deleted-cloud-docs -- --confirm
+```
+
+The script requires Firebase Admin credentials through `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_SERVICE_ACCOUNT_PATH`, `FIREBASE_SERVICE_ACCOUNT_JSON`, or the matching values in `.env.local`.
+
 ## Shared Firestore Document Shape
 
 Collection: `sharedDocuments`

@@ -1502,6 +1502,75 @@ a {
   background: var(--bg);
 }
 
+.md-pulse-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%),
+    var(--bg);
+  animation: md-loader-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.md-pulse-loader.leaving {
+  pointer-events: none;
+  animation: md-loader-exit 260ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.md-pulse-loader-mark {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent-contrast);
+  background:
+    linear-gradient(110deg, transparent 0%, transparent 34%, color-mix(in srgb, var(--accent-contrast) 34%, transparent) 46%, transparent 58%, transparent 100%),
+    var(--brand-bg);
+  background-size: 240% 100%, 100% 100%;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 18%, transparent);
+  overflow: hidden;
+  animation: md-loader-shimmer 1000ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.md-pulse-loader-mark span {
+  position: relative;
+  z-index: 1;
+  font-size: 1.42rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+@keyframes md-loader-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes md-loader-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes md-loader-shimmer {
+  0% {
+    background-position: 160% 0, 0 0;
+  }
+  100% {
+    background-position: -80% 0, 0 0;
+  }
+}
+
 .dashboard-topbar {
   min-height: 76px;
   display: flex;
@@ -2523,5 +2592,15 @@ select:focus-visible {
   .button-ripple {
     animation: none;
     opacity: 0;
+  }
+
+  .md-pulse-loader,
+  .md-pulse-loader.leaving {
+    animation: none;
+  }
+
+  .md-pulse-loader-mark {
+    animation: none;
+    background-position: 50% 0, 0 0;
   }
 }

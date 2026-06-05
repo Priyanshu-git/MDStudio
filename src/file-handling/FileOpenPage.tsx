@@ -59,7 +59,7 @@ export function FileOpenPage() {
     window.launchQueue.setConsumer((launchParams) => {
       const [fileHandle] = launchParams.files
       if (!fileHandle) {
-        navigate('/editor', { replace: true })
+        navigate('/', { replace: true })
         return
       }
 

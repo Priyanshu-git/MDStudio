@@ -17,9 +17,8 @@ This document describes the current product behavior that should remain stable a
 
 ## Desktop Authoring
 
-Desktop users work in one of three app-state-owned view modes:
+Desktop users work in one of two app-state-owned view modes:
 
-- `edit`: editor only
 - `split`: editor and preview
 - `preview`: preview only
 
@@ -112,4 +111,4 @@ The editor uses a grouped theme menu with Light and Dark sections. Shared pages 
 
 Local editing, local document reopening, local import, Markdown/HTML export, and rendering of bundled assets should work after the PWA has been installed and cached.
 
-Google sign-in, Firestore publishing/updating, and loading uncached shared links require network access.
+Google sign-in, Firestore publishing, private cloud backup/sync, and loading uncached shared links require network access.
