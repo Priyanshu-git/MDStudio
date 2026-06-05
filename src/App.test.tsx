@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { User } from 'firebase/auth'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -38,11 +39,16 @@ vi.mock('./firebase/auth', () => ({
   getOwnerProfile: vi.fn(() => ({ uid: 'user-1', displayName: 'Ada', email: 'ada@example.com' })),
 }))
 
-function mockMobileViewport(matches: boolean) {
+function mockMobileViewport(matches: boolean, phoneMatches = matches) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(max-width: 767px)' ? matches : false,
+      matches:
+        query === '(max-width: 1023px)'
+          ? matches
+          : query === '(max-width: 767px)'
+            ? phoneMatches
+            : false,
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -100,8 +106,8 @@ describe('App routing shell', () => {
   })
 
   it('shows only the first-landing loader until dashboard auth resolves', async () => {
-    let authCallback: ((user: unknown) => void) | null = null
-    vi.mocked(listenToAuthState).mockImplementationOnce((callback: (user: unknown) => void) => {
+    let authCallback: Parameters<typeof listenToAuthState>[0] | null = null
+    vi.mocked(listenToAuthState).mockImplementationOnce((callback) => {
       authCallback = callback
       return vi.fn()
     })
@@ -125,7 +131,7 @@ describe('App routing shell', () => {
         displayName: 'Ada Lovelace',
         email: 'ada@example.com',
         photoURL: null,
-      })
+      } as User)
     })
 
     expect(await screen.findByRole('heading', { name: 'Hi, Ada' })).toBeInTheDocument()
@@ -354,6 +360,7 @@ describe('App routing shell', () => {
       recentDocumentsState: 'ready',
       recentDocuments,
     })
+    mockMobileViewport(true)
     window.history.pushState({}, '', '/editor')
     render(
       <BrowserRouter>
@@ -362,10 +369,10 @@ describe('App routing shell', () => {
     )
     await act(async () => {})
     useAppStore.setState({ recentDocumentsState: 'ready', recentDocuments })
-    fireEvent.click(screen.getByRole('button', { name: 'Documents' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
     useAppStore.setState({ recentDocumentsState: 'ready', recentDocuments })
     const otherDocButtons = await screen.findAllByRole('button', { name: /Other Doc/ })
-    const otherDocOpenButton = otherDocButtons.find((button) => button.classList.contains('document-row-main'))
+    const otherDocOpenButton = otherDocButtons.find((button) => button.classList.contains('mobile-document-row-main'))
     expect(otherDocOpenButton).toBeDefined()
     fireEvent.click(otherDocOpenButton as HTMLButtonElement)
     await screen.findByRole('dialog', { name: 'Unsaved changes' })
@@ -460,7 +467,7 @@ describe('App routing shell', () => {
     expect(screen.getAllByRole('button', { name: 'Preview' })[0]).toBeInTheDocument()
   })
 
-  it('defaults to outline and switches desktop sidebar to documents', () => {
+  it('uses the desktop left pane only for outline', () => {
     window.history.pushState({}, '', '/editor')
     const { container } = render(
       <BrowserRouter>
@@ -468,18 +475,14 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(screen.queryByRole('heading', { name: 'Recent Documents' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Core markdown features/ })).toBeInTheDocument()
-    const outlineTab = container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(1)')
-    const documentsTab = container.querySelector<HTMLButtonElement>('.desktop-sidebar .sidebar-tab:nth-child(2)')
-    expect(outlineTab).toHaveClass('active')
-    expect(documentsTab).not.toBeNull()
-
-    fireEvent.click(documentsTab as HTMLButtonElement)
-
-    expect(documentsTab).toHaveClass('active')
-    expect(screen.getByRole('heading', { name: 'Recent Documents' })).toBeInTheDocument()
-    expect(screen.getByText('Sign in to see your backed up documents')).toBeInTheDocument()
+    const sidebar = container.querySelector<HTMLElement>('.desktop-sidebar')!
+    expect(within(sidebar).getByRole('heading', { name: 'Outline' })).toBeInTheDocument()
+    expect(within(sidebar).getByRole('button', { name: /Core markdown features/ })).toBeInTheDocument()
+    expect(within(sidebar).queryByRole('button', { name: 'Documents' })).not.toBeInTheDocument()
+    expect(within(sidebar).queryByRole('heading', { name: 'Recent Documents' })).not.toBeInTheDocument()
+    expect(within(sidebar).queryByRole('button', { name: 'New' })).not.toBeInTheDocument()
+    expect(within(sidebar).queryByRole('button', { name: 'Import .md' })).not.toBeInTheDocument()
+    expect(sidebar.querySelector('.sidebar-tabs')).not.toBeInTheDocument()
   })
 
   it('loads a launched markdown file into the editor route', async () => {
@@ -786,6 +789,38 @@ describe('App routing shell', () => {
     expect(useAppStore.getState().desktopViewMode).toBe('split')
   })
 
+  it('opens new document options and uploads markdown from the topbar new menu', () => {
+    window.history.pushState({}, '', '/editor')
+    useAppStore.setState({ saveStatus: 'saved' })
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const topbar = container.querySelector<HTMLElement>('.studio-topbar')!
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    const clickInput = vi.spyOn(fileInput, 'click').mockImplementation(() => undefined)
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'New options' }))
+    expect(screen.getByRole('menuitem', { name: 'New Document' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Upload .md file' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menuitem', { name: 'New Document' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'New options' }))
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('menuitem', { name: 'Upload .md file' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(topbar).getByRole('button', { name: 'New options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Upload .md file' }))
+
+    expect(clickInput).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menuitem', { name: 'Upload .md file' })).not.toBeInTheDocument()
+    clickInput.mockRestore()
+  })
+
   it('uses a secondary save button with save-as options instead of standalone export', async () => {
     window.history.pushState({}, '', '/editor')
     const { container } = render(
@@ -1060,6 +1095,29 @@ describe('App routing shell', () => {
     )
 
     expect(within(container.querySelector<HTMLElement>('.mobile-topbar')!).getByRole('button', { name: 'Dashboard' })).toBeInTheDocument()
+  })
+
+  it('uses the compact editor layout on tablet widths', () => {
+    mockMobileViewport(true, false)
+    useAppStore.setState({
+      isHydrated: true,
+      draftTitle: 'Tablet Test',
+      draftMarkdown: 'Body',
+      saveStatus: 'saved',
+      mobileTab: 'write',
+    })
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    expect(container.querySelector('.mobile-topbar')).toBeInTheDocument()
+    expect(container.querySelector('.mobile-mode-tabs')).toBeInTheDocument()
+    expect(container.querySelector('.mobile-bottom-bar')).toBeInTheDocument()
+    expect(container.querySelectorAll('.workspace-panel')).toHaveLength(0)
+    expect(container.querySelectorAll('.mobile-panel-surface .markdown-editor')).toHaveLength(1)
   })
 
   it('hides and shows the mobile appbar from active panel scroll direction', () => {

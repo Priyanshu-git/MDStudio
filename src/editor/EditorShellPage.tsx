@@ -4,20 +4,17 @@ import type { User } from 'firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import {
   Bold,
-  BookOpen,
   CheckSquare,
   Code,
   Copy,
   Edit3,
   Eye,
-  FileText,
   GitBranch,
   Cloud,
   ChevronDown,
   Heading1,
   Heading2,
   HardDrive,
-  Home,
   Image,
   Italic,
   Link,
@@ -63,8 +60,6 @@ type ToolbarItem = {
   label: string
   icon: typeof Bold
 }
-
-type DesktopSidebarTab = 'documents' | 'outline'
 
 type LinkDialogState = {
   mode: 'link' | 'image'
@@ -187,7 +182,7 @@ function useIsMobileViewport(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return false
     }
-    return window.matchMedia('(max-width: 767px)').matches
+    return window.matchMedia('(max-width: 1023px)').matches
   })
 
   useEffect(() => {
@@ -195,7 +190,7 @@ function useIsMobileViewport(): boolean {
       return
     }
 
-    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const mediaQuery = window.matchMedia('(max-width: 1023px)')
     const handleChange = () => setIsMobileViewport(mediaQuery.matches)
     handleChange()
 
@@ -219,6 +214,7 @@ export function EditorShellPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const desktopAccountRef = useRef<HTMLDivElement | null>(null)
   const mobileAccountRef = useRef<HTMLDivElement | null>(null)
+  const newMenuRef = useRef<HTMLDivElement | null>(null)
   const saveMenuRef = useRef<HTMLDivElement | null>(null)
   const mobilePanelRef = useRef<HTMLElement | null>(null)
   const linkTextInputRef = useRef<HTMLInputElement | null>(null)
@@ -237,7 +233,7 @@ export function EditorShellPage() {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [fileSearch, setFileSearch] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
-  const [desktopSidebarTab, setDesktopSidebarTab] = useState<DesktopSidebarTab>('outline')
+  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false)
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
   const [pendingDraftTransition, setPendingDraftTransition] = useState<PendingDraftTransition | null>(null)
   const [isResolvingDraftTransition, setIsResolvingDraftTransition] = useState(false)
@@ -368,6 +364,37 @@ export function EditorShellPage() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isProfileMenuOpen])
+
+  useEffect(() => {
+    if (!isNewMenuOpen) {
+      return
+    }
+
+    function closeNewMenu() {
+      setIsNewMenuOpen(false)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (newMenuRef.current?.contains(target)) {
+        return
+      }
+      closeNewMenu()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeNewMenu()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isNewMenuOpen])
 
   useEffect(() => {
     if (!isSaveMenuOpen) {
@@ -527,6 +554,7 @@ export function EditorShellPage() {
   }
 
   function guardedCreateNewDraft() {
+    setIsNewMenuOpen(false)
     runGuardedDraftTransition(createNewDraft)
   }
 
@@ -756,6 +784,7 @@ export function EditorShellPage() {
   }
 
   function handleImportClick() {
+    setIsNewMenuOpen(false)
     runGuardedDraftTransition(() => {
       if (importInputRef.current) {
         importInputRef.current.value = ''
@@ -810,14 +839,11 @@ export function EditorShellPage() {
       />
 
       <header className="studio-topbar">
-        <div className="brand-lockup">
+        <button type="button" className="brand-lockup brand-button" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
           <span className="app-mark" aria-hidden="true">
             <Edit3 size={18} />
           </span>
           <strong>MD Studio</strong>
-        </div>
-        <button type="button" className="icon-button bordered" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
-          <Home size={18} />
         </button>
         <input
           className="title-input"
@@ -841,10 +867,28 @@ export function EditorShellPage() {
           ))}
         </nav>
         <div className="topbar-spacer" />
-        <button type="button" className="primary-button" onClick={guardedCreateNewDraft}>
-          <Plus size={16} />
-          New
-        </button>
+        <div className="new-split-menu" ref={newMenuRef}>
+          <button type="button" className="primary-button new-split-primary" onClick={guardedCreateNewDraft}>
+            <Plus size={16} />
+            New
+          </button>
+          <button
+            type="button"
+            className="primary-button new-split-toggle"
+            aria-label="New options"
+            aria-haspopup="menu"
+            aria-expanded={isNewMenuOpen}
+            onClick={() => setIsNewMenuOpen((open) => !open)}
+          >
+            <ChevronDown size={16} />
+          </button>
+          {isNewMenuOpen ? (
+            <div className="save-export-popover new-split-popover" role="menu" aria-label="New document options">
+              <button type="button" role="menuitem" onClick={guardedCreateNewDraft}>New Document</button>
+              <button type="button" role="menuitem" onClick={handleImportClick}>Upload .md file</button>
+            </div>
+          ) : null}
+        </div>
         <div className="save-split-menu" ref={saveMenuRef}>
           <button type="button" className="secondary-button save-split-primary" onClick={() => void handleSave()} disabled={saveStatus === 'saving'}>
             <Save size={16} />
@@ -901,8 +945,8 @@ export function EditorShellPage() {
       </header>
 
       <header className={isMobileAppbarHidden && !isProfileMenuOpen ? 'mobile-topbar appbar-hidden' : 'mobile-topbar'}>
-        <button type="button" className="icon-button bordered mobile-dashboard-button" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
-          <Home size={18} />
+        <button type="button" className="app-mark app-mark-button mobile-dashboard-button" aria-label="Dashboard" title="Dashboard" onClick={guardedOpenDashboard}>
+          <Edit3 size={18} />
         </button>
         <div className="mobile-title-block">
           <strong>{mobileTab === 'files' ? 'MD Studio' : draftTitle}</strong>
@@ -955,47 +999,7 @@ export function EditorShellPage() {
       <section className="studio-workspace">
         {showSidebar ? (
           <aside className="desktop-sidebar">
-            <div className="sidebar-tabs">
-              <button
-                type="button"
-                className={desktopSidebarTab === 'outline' ? 'sidebar-tab active' : 'sidebar-tab'}
-                onClick={() => setDesktopSidebarTab('outline')}
-              >
-                <BookOpen size={16} />
-                Outline
-              </button>
-              <button
-                type="button"
-                className={desktopSidebarTab === 'documents' ? 'sidebar-tab active' : 'sidebar-tab'}
-                onClick={() => setDesktopSidebarTab('documents')}
-              >
-                <FileText size={16} />
-                Documents
-              </button>
-            </div>
-            {desktopSidebarTab === 'documents' ? (
-              <>
-                <div className="sidebar-actions">
-                  <button type="button" className="primary-button" onClick={guardedCreateNewDraft}>
-                    <Plus size={18} />
-                    New
-                  </button>
-                  <button type="button" className="icon-button bordered" onClick={handleImportClick} aria-label="Import .md">
-                    <Upload size={18} />
-                  </button>
-                </div>
-                <DocumentList
-                  documents={filteredDocuments}
-                  recentDocumentsState={recentDocumentsState}
-                  activeDocId={activeDocId}
-                  now={relativeTimeNow}
-                  onOpen={(id) => void guardedOpenDocument(id)}
-                  onDelete={(item) => void handleDeleteRecentDocument(item)}
-                />
-              </>
-            ) : (
-              <Outline outline={outline} onSelect={handleOutlineSelect} />
-            )}
+            <Outline outline={outline} onSelect={handleOutlineSelect} />
           </aside>
         ) : null}
 

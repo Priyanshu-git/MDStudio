@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Copy, Edit3, Home, LogIn, MoreVertical, Share2 } from 'lucide-react'
+import { Copy, Edit3, LogIn, MoreVertical, Share2 } from 'lucide-react'
 import { MarkdownPreview } from '../../preview/MarkdownPreview'
 import { getSharedDocumentById } from '../../storage/shareDocuments'
 import { createDocument, getDocumentById, updateDocument } from '../../storage/documents'
@@ -259,8 +259,8 @@ export function SharePlaceholderPage() {
     <main className="shared-shell">
       <header className={isAppbarHidden && !isShareMenuOpen ? 'shared-topbar appbar-hidden' : 'shared-topbar'}>
         <div className="shared-title-group">
-          <button type="button" className="icon-button bordered" aria-label="Dashboard" title="Dashboard" onClick={() => navigate('/')}>
-            <Home size={18} />
+          <button type="button" className="app-mark app-mark-button" aria-label="Dashboard" title="Dashboard" onClick={() => navigate('/')}>
+            <Edit3 size={18} />
           </button>
           <strong>{document?.title ?? 'Shared Document'}</strong>
         </div>
