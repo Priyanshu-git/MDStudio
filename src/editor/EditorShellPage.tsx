@@ -47,13 +47,8 @@ import type { DesktopViewMode, MobileTab, RecentDocumentItem, RecentDocumentsSta
 import type { MarkdownInsertAction } from './markdownInsert'
 import { backUpLocalDocument, deleteRecentDocument } from '../storage/documentSync'
 import { useRelativeTimeNow } from './useRelativeTimeNow'
-
-type OutlineItem = {
-  id: string
-  text: string
-  level: number
-  line: number
-}
+import { Outline } from '../outline/Outline'
+import { buildOutline, type OutlineItem } from '../outline/outlineModel'
 
 type ToolbarItem = {
   action: MarkdownInsertAction
@@ -109,25 +104,6 @@ const statusLabels: Record<SaveStatus, string> = {
 function formatPageTitle(title: string): string {
   const normalizedTitle = title.trim() || 'Untitled Document'
   return `${normalizedTitle} | MD Studio`
-}
-
-function buildOutline(markdown: string): OutlineItem[] {
-  return markdown
-    .split('\n')
-    .map((line, index) => {
-      const match = line.match(/^(#{1,6})\s+(.+)$/)
-      if (!match) {
-        return null
-      }
-      const text = match[2].replace(/[#*_`]/g, '').trim()
-      return {
-        id: `${index}-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        text,
-        level: match[1].length,
-        line: index + 1,
-      }
-    })
-    .filter(Boolean) as OutlineItem[]
 }
 
 function countWords(markdown: string): number {
@@ -1362,39 +1338,6 @@ export function DocumentList({
           )
         })}
       </div>
-    </section>
-  )
-}
-
-function Outline({
-  outline,
-  mobile = false,
-  onSelect,
-}: {
-  outline: OutlineItem[]
-  mobile?: boolean
-  onSelect: (item: OutlineItem) => void
-}) {
-  return (
-    <section className={mobile ? 'outline-panel mobile' : 'sidebar-section outline-panel'}>
-      <h2>Outline</h2>
-      {outline.length ? (
-        <div className="outline-list">
-          {outline.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`outline-row outline-level-${item.level}`}
-              onClick={() => onSelect(item)}
-            >
-              <span>{item.text}</span>
-              <small>H{item.level}</small>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="muted-text">No headings yet.</p>
-      )}
     </section>
   )
 }

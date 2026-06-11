@@ -48,6 +48,8 @@ function mockMobileViewport(matches: boolean, phoneMatches = matches) {
           ? matches
           : query === '(max-width: 767px)'
             ? phoneMatches
+            : query === '(min-width: 1560px)'
+              ? !matches
             : false,
       media: query,
       onchange: null,
@@ -1418,6 +1420,77 @@ describe('App routing shell', () => {
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
   })
 
+  it('shows an expanded floating outline on wide desktop and scrolls to headings', async () => {
+    window.history.pushState({}, '', '/share/public-outline')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-outline',
+      title: 'Outline Test',
+      markdown: '# Introduction\n\nBody\n\n### Deep Section',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+    const scrollTo = vi.fn()
+    Object.defineProperty(window, 'scrollTo', { configurable: true, value: scrollTo })
+
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Introduction' })
+    const panel = container.querySelector<HTMLElement>('.shared-desktop-outline-panel')!
+    expect(panel).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Introduction H1' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Deep Section H3' })).toBeInTheDocument()
+
+    const target = screen.getByRole('heading', { level: 3, name: 'Deep Section' })
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+      top: 300,
+      bottom: 330,
+      left: 0,
+      right: 0,
+      width: 100,
+      height: 30,
+      x: 0,
+      y: 300,
+      toJSON: () => ({}),
+    })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Deep Section H3' }))
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 216, behavior: 'smooth' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse document outline' }))
+    expect(container.querySelector('.shared-desktop-outline-panel')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open document outline' }))
+    expect(container.querySelector('.shared-desktop-outline-panel')).toBeInTheDocument()
+  })
+
+  it('starts the floating desktop outline collapsed when the viewport gutter is narrow', async () => {
+    mockMobileViewport(true, false)
+    window.history.pushState({}, '', '/share/public-compact-desktop-outline')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-compact-desktop-outline',
+      title: 'Compact Desktop Outline',
+      markdown: '# Start',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Start' })
+    expect(screen.queryByRole('button', { name: 'Collapse document outline' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open document outline' }))
+    expect(screen.getByRole('button', { name: 'Collapse document outline' })).toBeInTheDocument()
+  })
+
   it('navigates from a shared document back to the dashboard', async () => {
     window.history.pushState({}, '', '/share/public-dashboard')
     vi.mocked(getSharedDocumentById).mockResolvedValue({
@@ -1475,6 +1548,64 @@ describe('App routing shell', () => {
     expect(screen.getByRole('menuitem', { name: 'Make a Copy' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'blue-eclipse' } })
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
+  })
+
+  it('opens and dismisses the mobile shared-document outline with focus restoration', async () => {
+    mockMobileViewport(true)
+    window.history.pushState({}, '', '/share/public-mobile-outline')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-mobile-outline',
+      title: 'Mobile Outline Test',
+      markdown: '# Start\n\n## Next',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { level: 1, name: 'Start' })
+    const trigger = screen.getByRole('button', { name: 'Open document outline' })
+    fireEvent.click(trigger)
+
+    const dialog = screen.getByRole('dialog', { name: 'Document Outline' })
+    expect(within(dialog).getByRole('button', { name: 'Start H1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close document outline' })).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Document Outline' })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+
+    fireEvent.click(trigger)
+    fireEvent.mouseDown(container.querySelector<HTMLElement>('.shared-outline-backdrop')!)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Document Outline' })).not.toBeInTheDocument())
+  })
+
+  it('keeps the mobile outline available for shared documents without headings', async () => {
+    mockMobileViewport(true)
+    window.history.pushState({}, '', '/share/public-empty-outline')
+    vi.mocked(getSharedDocumentById).mockResolvedValue({
+      id: 'public-empty-outline',
+      title: 'No Outline Test',
+      markdown: 'A paragraph without headings.',
+      ownerUid: 'owner-1',
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByText('A paragraph without headings.')
+    fireEvent.click(screen.getByRole('button', { name: 'Open document outline' }))
+    expect(screen.getByRole('dialog', { name: 'Document Outline' })).toHaveTextContent('No headings yet.')
   })
 
   it('hides and shows the shared appbar from window scroll direction', async () => {

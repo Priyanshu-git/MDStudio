@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Copy, Edit3, LogIn, MoreVertical, Share2 } from 'lucide-react'
+import { Copy, Edit3, ListTree, LogIn, MoreVertical, Share2, X } from 'lucide-react'
 import { MarkdownPreview } from '../../preview/MarkdownPreview'
+import { Outline } from '../../outline/Outline'
+import { buildOutline, type OutlineItem } from '../../outline/outlineModel'
 import { getSharedDocumentById } from '../../storage/shareDocuments'
 import { createDocument, getDocumentById, updateDocument } from '../../storage/documents'
 import type { Document, SharedDocument, ThemeName } from '../../types'
@@ -57,10 +59,36 @@ function useIsCompactSharedTopbar() {
   return isCompact
 }
 
+function useIsWideSharedViewport() {
+  const [isWide, setIsWide] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return true
+    }
+    return window.matchMedia('(min-width: 1560px)').matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(min-width: 1560px)')
+    const handleChange = () => setIsWide(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  return isWide
+}
+
 export function SharePlaceholderPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const previewRef = useRef<HTMLElement | null>(null)
+  const outlineButtonRef = useRef<HTMLButtonElement | null>(null)
+  const outlineCloseButtonRef = useRef<HTMLButtonElement | null>(null)
   const theme = useAppStore((state) => state.theme)
   const setTheme = useAppStore((state) => state.setTheme)
   const setActiveDocId = useAppStore((state) => state.setActiveDocId)
@@ -76,7 +104,10 @@ export function SharePlaceholderPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false)
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false)
   const isCompactTopbar = useIsCompactSharedTopbar()
+  const isWideSharedViewport = useIsWideSharedViewport()
+  const [isDesktopOutlineOpen, setIsDesktopOutlineOpen] = useState(isWideSharedViewport)
   const isAppbarHidden = useAutoHideAppbar()
 
   const shareUrl = useMemo(() => {
@@ -88,6 +119,7 @@ export function SharePlaceholderPage() {
   }, [id])
 
   const isOwner = Boolean(user && document?.ownerUid && user.uid === document.ownerUid)
+  const outline = useMemo(() => buildOutline(document?.markdown ?? ''), [document?.markdown])
 
   useEffect(() => listenToAuthState(setUser), [])
 
@@ -125,8 +157,37 @@ export function SharePlaceholderPage() {
   useEffect(() => {
     if (!isCompactTopbar) {
       setIsShareMenuOpen(false)
+      setIsOutlineOpen(false)
     }
   }, [isCompactTopbar])
+
+  useEffect(() => {
+    setIsDesktopOutlineOpen(isWideSharedViewport)
+  }, [id, isWideSharedViewport])
+
+  useEffect(() => {
+    if (!isOutlineOpen) {
+      return
+    }
+
+    const previousOverflow = window.document.body.style.overflow
+    const outlineButton = outlineButtonRef.current
+    window.document.body.style.overflow = 'hidden'
+    outlineCloseButtonRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOutlineOpen(false)
+      }
+    }
+
+    window.document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.document.body.style.overflow = previousOverflow
+      window.document.removeEventListener('keydown', handleKeyDown)
+      outlineButton?.focus()
+    }
+  }, [isOutlineOpen])
 
   useEffect(() => {
     window.document.title = formatPageTitle(document?.title)
@@ -255,9 +316,21 @@ export function SharePlaceholderPage() {
     }
   }
 
+  function handleOutlineSelect(item: OutlineItem) {
+    setIsOutlineOpen(false)
+    const target = previewRef.current?.querySelector<HTMLElement>(`[data-source-line="${item.line}"]`)
+    if (!target) {
+      return
+    }
+
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const top = target.getBoundingClientRect().top + window.scrollY - 84
+    window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' })
+  }
+
   return (
     <main className="shared-shell">
-      <header className={isAppbarHidden && !isShareMenuOpen ? 'shared-topbar appbar-hidden' : 'shared-topbar'}>
+      <header className={isAppbarHidden && !isShareMenuOpen && !isOutlineOpen ? 'shared-topbar appbar-hidden' : 'shared-topbar'}>
         <div className="shared-title-group">
           <button type="button" className="app-mark app-mark-button" aria-label="Dashboard" title="Dashboard" onClick={() => navigate('/')}>
             <Edit3 size={18} />
@@ -375,10 +448,84 @@ export function SharePlaceholderPage() {
             <Share2 size={18} />
             <span>This is a shared document. You can view it or make your own editable copy.</span>
           </section>
-          <section className="shared-preview">
+          <section className="shared-preview" ref={previewRef}>
             {actionError ? <p className="error-text">{actionError}</p> : null}
             <MarkdownPreview markdown={document.markdown} theme={theme} />
           </section>
+          {!isCompactTopbar ? (
+            <div className={isDesktopOutlineOpen ? 'shared-desktop-outline open' : 'shared-desktop-outline'}>
+              {isDesktopOutlineOpen ? (
+                <aside className="shared-desktop-outline-panel" aria-label="Document outline">
+                  <div className="shared-desktop-outline-header">
+                    <span>Outline</span>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Collapse document outline"
+                      onClick={() => setIsDesktopOutlineOpen(false)}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                  <Outline outline={outline} onSelect={handleOutlineSelect} />
+                </aside>
+              ) : (
+                <button
+                  type="button"
+                  className="shared-desktop-outline-trigger"
+                  aria-label="Open document outline"
+                  aria-expanded="false"
+                  onClick={() => setIsDesktopOutlineOpen(true)}
+                >
+                  <ListTree size={18} />
+                  Outline
+                </button>
+              )}
+            </div>
+          ) : null}
+          {isCompactTopbar ? (
+            <>
+              <button
+                ref={outlineButtonRef}
+                type="button"
+                className="shared-outline-fab"
+                aria-label="Open document outline"
+                aria-haspopup="dialog"
+                aria-expanded={isOutlineOpen}
+                aria-controls="shared-outline-sheet"
+                onClick={() => setIsOutlineOpen(true)}
+              >
+                <ListTree size={19} />
+                Outline
+              </button>
+              {isOutlineOpen ? (
+                <div className="shared-outline-backdrop" role="presentation" onMouseDown={() => setIsOutlineOpen(false)}>
+                  <section
+                    id="shared-outline-sheet"
+                    className="shared-outline-sheet"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="shared-outline-title"
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
+                    <div className="shared-outline-sheet-header">
+                      <h2 id="shared-outline-title">Document Outline</h2>
+                      <button
+                        ref={outlineCloseButtonRef}
+                        type="button"
+                        className="icon-button"
+                        aria-label="Close document outline"
+                        onClick={() => setIsOutlineOpen(false)}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <Outline outline={outline} mobile onSelect={handleOutlineSelect} />
+                  </section>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           {copyState === 'copied' ? <div className="studio-banner">Link copied</div> : null}
           {copyState === 'failed' ? <div className="studio-banner error">Copy failed</div> : null}
         </>
