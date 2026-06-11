@@ -191,7 +191,7 @@ export function SharePlaceholderPage() {
       setActiveDocId(localDoc.id)
       setDraftTitle(localDoc.title)
       setDraftMarkdown(localDoc.markdown)
-      navigate('/editor')
+      navigate('/editor', { state: { editorIntent: 'open-existing' } })
     } catch {
       setActionError('Unable to create an editable copy right now.')
     } finally {
@@ -233,7 +233,7 @@ export function SharePlaceholderPage() {
       setDraftTitle(localDoc.title)
       setDraftMarkdown(localDoc.markdown)
       linkActiveShare(id, localDoc.title, localDoc.markdown)
-      navigate('/editor')
+      navigate('/editor', { state: { editorIntent: 'open-existing' } })
     } catch {
       setActionError('Unable to open the original document right now.')
     } finally {

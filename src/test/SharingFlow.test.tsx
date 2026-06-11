@@ -61,6 +61,8 @@ describe('Sharing flow', () => {
   })
 
   it('creates a read-only share link from editor', async () => {
+    await import('../editor/EditorShellPage')
+
     window.history.pushState({}, '', '/editor')
     vi.mocked(publishSharedDocument).mockResolvedValue({ shareId: 'share-1' })
 
@@ -71,7 +73,7 @@ describe('Sharing flow', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /Markdown Rendering Test File/ })).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Untitled Document')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getAllByRole('button', { name: /Share/ })[0])
@@ -108,11 +110,11 @@ describe('Sharing flow', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /Markdown Rendering Test File/ })).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Untitled Document')).toBeInTheDocument()
     })
 
     act(() => {
-      useAppStore.getState().linkActiveShare('share-xyz', 'Markdown Rendering Test File', useAppStore.getState().draftMarkdown)
+      useAppStore.getState().linkActiveShare('share-xyz', 'Untitled Document', useAppStore.getState().draftMarkdown)
     })
 
     act(() => {

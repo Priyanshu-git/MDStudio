@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Bold,
   CheckSquare,
@@ -208,6 +208,7 @@ function useIsMobileViewport(): boolean {
 
 export function EditorShellPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const editorRef = useRef<MarkdownEditorHandle | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingPreviewLineRef = useRef<number | null>(null)
@@ -250,6 +251,7 @@ export function EditorShellPage() {
   const desktopViewMode = useAppStore((state) => state.desktopViewMode)
   const saveStatus = useAppStore((state) => state.saveStatus)
   const saveError = useAppStore((state) => state.saveError)
+  const isHydrated = useAppStore((state) => state.isHydrated)
   const hydrateDocument = useAppStore((state) => state.hydrateDocument)
   const refreshDocuments = useAppStore((state) => state.refreshDocuments)
   const refreshRecentDocuments = useAppStore((state) => state.refreshRecentDocuments)
@@ -268,9 +270,9 @@ export function EditorShellPage() {
   const setLastCloudSavedSnapshot = useAppStore((state) => state.setLastCloudSavedSnapshot)
 
   const deferredMarkdown = useDeferredValue(draftMarkdown)
-  const outline = useMemo(() => buildOutline(draftMarkdown), [draftMarkdown])
-  const lines = useMemo(() => draftMarkdown.split('\n').length, [draftMarkdown])
-  const words = useMemo(() => countWords(draftMarkdown), [draftMarkdown])
+  const outline = useMemo(() => buildOutline(deferredMarkdown), [deferredMarkdown])
+  const lines = useMemo(() => deferredMarkdown.split('\n').length, [deferredMarkdown])
+  const words = useMemo(() => countWords(deferredMarkdown), [deferredMarkdown])
   const filteredDocuments = useMemo(
     () =>
       recentDocuments.filter((doc) =>
@@ -292,6 +294,7 @@ export function EditorShellPage() {
     resetKey: mobileTab,
     scrollRef: mobilePanelRef,
   })
+  const editorIntent = (location.state as { editorIntent?: string } | null)?.editorIntent
 
   const openLinkDialog = useCallback((action: 'link' | 'image') => {
     const selection = editorRef.current?.getSelectionSnapshot() ?? null
@@ -304,9 +307,18 @@ export function EditorShellPage() {
   }, [])
 
   useEffect(() => {
-    void hydrateDocument()
+    if (isHydrated) {
+      void refreshDocuments()
+      return
+    }
+    if (editorIntent === 'open-existing') {
+      void hydrateDocument()
+      void refreshDocuments()
+      return
+    }
+    createNewDraft()
     void refreshDocuments()
-  }, [hydrateDocument, refreshDocuments])
+  }, [createNewDraft, editorIntent, hydrateDocument, isHydrated, refreshDocuments])
 
   useEffect(() => {
     document.title = formatPageTitle(draftTitle)

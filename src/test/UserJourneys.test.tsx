@@ -53,15 +53,17 @@ describe('User Journeys', () => {
   })
 
   it('completes a full editing and viewing cycle', async () => {
+    await import('../editor/EditorShellPage')
+
     const { unmount } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
 
-    // 1. Initial hydration
+    // 1. Direct editor visits start a fresh starter draft.
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /Markdown Rendering Test File/ })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: 'Untitled Document' })).toBeInTheDocument()
     })
 
     // 2. Edit markdown through the V2 store-backed CodeMirror flow
@@ -87,8 +89,9 @@ describe('User Journeys', () => {
     await act(async () => {
       await useAppStore.getState().saveDraft()
     })
+    const savedDocId = useAppStore.getState().activeDocId!
 
-    // 7. Simulate reload by unmounting and remounting
+    // 7. Simulate reopening the saved document through its explicit route.
     unmount()
     useAppStore.setState({
       activeDocId: null,
@@ -104,6 +107,7 @@ describe('User Journeys', () => {
       saveStatus: 'local-only',
       saveError: null,
     })
+    window.history.pushState({}, '', `/doc/${savedDocId}`)
     
     render(
       <BrowserRouter>
@@ -111,7 +115,7 @@ describe('User Journeys', () => {
       </BrowserRouter>,
     )
 
-    // Verify state restored from IndexedDB
+    // Verify state restored from IndexedDB through the explicit document route.
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
     })

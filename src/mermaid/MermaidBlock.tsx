@@ -6,15 +6,41 @@ type MermaidBlockProps = {
   theme: ThemeName
 }
 
+type MermaidModule = typeof import('mermaid')
+
+const renderedSvgCache = new Map<string, string>()
+let mermaidModulePromise: Promise<MermaidModule> | null = null
+let initializedTheme: string | null = null
+
+function mermaidThemeForAppTheme(theme: ThemeName): 'dark' | 'default' {
+  return theme === 'github-dark' || theme === 'one-dark' || theme === 'blue-eclipse' ? 'dark' : 'default'
+}
+
+function getMermaidModule() {
+  mermaidModulePromise ??= import('mermaid')
+  return mermaidModulePromise
+}
+
 async function renderMermaid(id: string, code: string, theme: ThemeName): Promise<string> {
-  const mermaid = (await import('mermaid')).default
-  const mermaidTheme = theme === 'github-dark' || theme === 'one-dark' || theme === 'blue-eclipse' ? 'dark' : 'default'
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    theme: mermaidTheme,
-  })
+  const mermaidTheme = mermaidThemeForAppTheme(theme)
+  const cacheKey = `${mermaidTheme}\u0000${id}\u0000${code}`
+  const cached = renderedSvgCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const mermaid = (await getMermaidModule()).default
+  if (initializedTheme !== mermaidTheme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: mermaidTheme,
+    })
+    initializedTheme = mermaidTheme
+  }
+
   const result = await mermaid.render(`mermaid-${id}`, code)
+  renderedSvgCache.set(cacheKey, result.svg)
   return result.svg
 }
 

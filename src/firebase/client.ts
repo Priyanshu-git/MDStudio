@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app'
-import { getAnalytics } from 'firebase/analytics'
 import { getFirestore } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 
@@ -27,15 +26,14 @@ export const app = initializeApp(firebaseConfig)
 export const firestore = getFirestore(app)
 export const auth = getAuth(app)
 
-function initializeAnalyticsSafely() {
+export async function initializeAnalyticsSafely() {
   if (typeof window === 'undefined' || import.meta.env.MODE === 'test') {
     return null
   }
   try {
+    const { getAnalytics } = await import('firebase/analytics')
     return getAnalytics(app)
   } catch {
     return null
   }
 }
-
-export const analytics = initializeAnalyticsSafely()

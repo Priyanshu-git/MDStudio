@@ -9,6 +9,24 @@ type CodeBlockProps = {
   showCopyButton?: boolean
 }
 
+type ShikiModule = typeof import('shiki')
+
+const highlightedCache = new Map<string, string>()
+let shikiModulePromise: Promise<ShikiModule> | null = null
+
+function shikiThemeForAppTheme(theme: ThemeName): string {
+  return theme === 'one-dark' || theme === 'blue-eclipse'
+    ? 'one-dark-pro'
+    : theme === 'github-dark'
+      ? 'github-dark'
+      : 'github-light'
+}
+
+function getShikiModule() {
+  shikiModulePromise ??= import('shiki')
+  return shikiModulePromise
+}
+
 function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
@@ -23,31 +41,47 @@ export function CodeBlock({
   showLineNumbers = true,
   showCopyButton = true,
 }: CodeBlockProps) {
-  const [highlighted, setHighlighted] = useState<string>('')
   const normalizedLanguage = useMemo(() => language || 'text', [language])
+  const shikiTheme = useMemo(() => shikiThemeForAppTheme(theme), [theme])
+  const cacheKey = useMemo(
+    () => `${shikiTheme}\u0000${normalizedLanguage}\u0000${code}`,
+    [code, normalizedLanguage, shikiTheme],
+  )
+  const [highlightedResult, setHighlightedResult] = useState<{ key: string; html: string } | null>(null)
+  const lineNumbers = useMemo(
+    () =>
+      code
+        .split('\n')
+        .map((_, index) => String(index + 1))
+        .join('\n'),
+    [code],
+  )
+  const highlighted = highlightedCache.get(cacheKey) ?? (highlightedResult?.key === cacheKey ? highlightedResult.html : '')
 
   useEffect(() => {
     let cancelled = false
+    if (highlightedCache.has(cacheKey)) {
+      return () => {
+        cancelled = true
+      }
+    }
 
     async function runHighlight() {
       try {
-        const { codeToHtml } = await import('shiki')
-        const shikiTheme =
-          theme === 'one-dark' || theme === 'blue-eclipse'
-            ? 'one-dark-pro'
-            : theme === 'github-dark'
-              ? 'github-dark'
-              : 'github-light'
+        const { codeToHtml } = await getShikiModule()
         const html = await codeToHtml(code, {
           lang: normalizedLanguage,
           theme: shikiTheme,
         })
         if (!cancelled) {
-          setHighlighted(html)
+          highlightedCache.set(cacheKey, html)
+          setHighlightedResult({ key: cacheKey, html })
         }
       } catch {
+        const fallback = `<pre><code>${escapeHtml(code)}</code></pre>`
         if (!cancelled) {
-          setHighlighted(`<pre><code>${escapeHtml(code)}</code></pre>`)
+          highlightedCache.set(cacheKey, fallback)
+          setHighlightedResult({ key: cacheKey, html: fallback })
         }
       }
     }
@@ -56,7 +90,7 @@ export function CodeBlock({
     return () => {
       cancelled = true
     }
-  }, [code, normalizedLanguage, theme])
+  }, [cacheKey, code, normalizedLanguage, shikiTheme])
 
   const onCopy = async () => {
     if (navigator.clipboard) {
@@ -77,10 +111,7 @@ export function CodeBlock({
       <div className="code-content">
         {showLineNumbers ? (
           <pre className="line-number-gutter" aria-hidden="true">
-            {code
-              .split('\n')
-              .map((_, index) => String(index + 1))
-              .join('\n')}
+            {lineNumbers}
           </pre>
         ) : null}
         <div className="code-highlight" dangerouslySetInnerHTML={{ __html: highlighted }} />

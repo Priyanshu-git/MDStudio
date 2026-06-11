@@ -12,7 +12,7 @@ export function LocalDocumentPage() {
     clearShareLink()
     if (id) {
       void openDocument(id).then(() => {
-        navigate('/editor', { replace: true })
+        navigate('/editor', { replace: true, state: { editorIntent: 'open-existing' } })
       })
     }
   }, [clearShareLink, id, navigate, openDocument])

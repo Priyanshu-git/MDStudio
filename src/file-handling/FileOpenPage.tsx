@@ -37,7 +37,7 @@ export function FileOpenPage() {
     try {
       const markdown = await file.text()
       importMarkdownDraft(file.name, markdown)
-      navigate('/editor', { replace: true })
+      navigate('/editor', { replace: true, state: { editorIntent: 'open-existing' } })
     } catch {
       setStatus('error')
       setErrorMessage('Unable to read that markdown file.')

@@ -48,6 +48,18 @@ describe('App Store (Zustand)', () => {
     expect(doc?.markdown).toBe('# New Content')
   })
 
+  it('creates a hydrated local-only starter draft', () => {
+    useAppStore.getState().createNewDraft()
+
+    expect(useAppStore.getState().activeDocId).toBeNull()
+    expect(useAppStore.getState().activeShareId).toBeNull()
+    expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
+    expect(useAppStore.getState().draftMarkdown).toContain('Welcome to MD Studio')
+    expect(useAppStore.getState().draftMarkdown).toContain('```mermaid')
+    expect(useAppStore.getState().isHydrated).toBe(true)
+    expect(useAppStore.getState().saveStatus).toBe('local-only')
+  })
+
   it('keeps shared documents marked as firebase backed after local save', async () => {
     await useAppStore.getState().hydrateDocument()
     const docId = useAppStore.getState().activeDocId!

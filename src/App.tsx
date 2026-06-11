@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { EditorShellPage } from './editor/EditorShellPage'
-import { FileOpenPage } from './file-handling/FileOpenPage'
-import { HomePage } from './components/pages/HomePage'
-import { LocalDocumentPage } from './components/pages/LocalDocumentPage'
-import { SharePlaceholderPage } from './components/pages/SharePlaceholderPage'
 import { useAppStore } from './state/useAppStore'
+
+const EditorShellPage = lazy(() => import('./editor/EditorShellPage').then((module) => ({ default: module.EditorShellPage })))
+const FileOpenPage = lazy(() => import('./file-handling/FileOpenPage').then((module) => ({ default: module.FileOpenPage })))
+const HomePage = lazy(() => import('./components/pages/HomePage').then((module) => ({ default: module.HomePage })))
+const LocalDocumentPage = lazy(() => import('./components/pages/LocalDocumentPage').then((module) => ({ default: module.LocalDocumentPage })))
+const SharePlaceholderPage = lazy(() => import('./components/pages/SharePlaceholderPage').then((module) => ({ default: module.SharePlaceholderPage })))
 
 export function App() {
   const theme = useAppStore((state) => state.theme)
@@ -119,13 +120,15 @@ export function App() {
   }, [])
 
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/editor" element={<EditorShellPage />} />
-      <Route path="/open-md" element={<FileOpenPage />} />
-      <Route path="/doc/:id" element={<LocalDocumentPage />} />
-      <Route path="/share/:id" element={<SharePlaceholderPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<main className="shared-state">Loading MD Studio...</main>}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/editor" element={<EditorShellPage />} />
+        <Route path="/open-md" element={<FileOpenPage />} />
+        <Route path="/doc/:id" element={<LocalDocumentPage />} />
+        <Route path="/share/:id" element={<SharePlaceholderPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

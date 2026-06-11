@@ -261,7 +261,7 @@ export function HomePage() {
 
   function handleSampleDocument() {
     createSampleDraft()
-    navigate('/editor')
+    navigate('/editor', { state: { editorIntent: 'open-existing' } })
   }
 
   function handleImportClick() {
@@ -284,12 +284,12 @@ export function HomePage() {
     }
     const markdown = await file.text()
     importMarkdownDraft(file.name, markdown)
-    navigate('/editor')
+    navigate('/editor', { state: { editorIntent: 'open-existing' } })
   }
 
   async function handleOpenDocument(docId: string) {
     await openDocument(docId)
-    navigate('/editor')
+    navigate('/editor', { state: { editorIntent: 'open-existing' } })
   }
 
   async function handleDeleteDocument(item: RecentDocumentItem) {

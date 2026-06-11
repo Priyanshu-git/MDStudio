@@ -18,7 +18,6 @@ import {
   setThemePreference,
   updateDocument,
 } from '../storage/documents'
-import { refreshLocalRecentDocuments, refreshRecentDocumentsForUser } from '../storage/documentSync'
 
 const DEFAULT_MARKDOWN = `# Markdown Rendering Test File
 
@@ -64,6 +63,71 @@ graph TD
   B -- No --> D[Debug]
   D --> B
 \`\`\`
+`
+
+const STARTER_MARKDOWN = `# Untitled Document
+
+Welcome to MD Studio. This starter note is editable Markdown, and the preview pane updates as you write.
+
+## What you can create
+
+- **Formatted text** with bold, italic, links, and quotes
+- Task lists for lightweight planning
+- Tables for structured notes
+- Code blocks with syntax highlighting
+- Math equations and Mermaid diagrams
+- Images by URL
+- Local drafts that can be saved, exported, or shared
+
+## Try a checklist
+
+- [x] Open a fresh document
+- [ ] Replace this guide with your own notes
+- [ ] Save locally when you are ready
+
+## Tables
+
+| Feature | Use it for |
+| --- | --- |
+| Live preview | Check formatting while you type |
+| Recent documents | Reopen saved local drafts |
+| Export | Save your work as Markdown or HTML |
+
+## Code
+
+\`\`\`ts
+type MarkdownDocument = {
+  title: string
+  body: string
+  saved: boolean
+}
+\`\`\`
+
+## Math
+
+Inline math works like $a^2 + b^2 = c^2$.
+
+$$
+E = mc^2
+$$
+
+## Diagrams
+
+\`\`\`mermaid
+flowchart LR
+  Write[Write Markdown] --> Preview[Preview]
+  Preview --> Export[Export or Share]
+\`\`\`
+
+## Images and links
+
+Add images by URL:
+
+![Markdown logo](https://markdown-here.com/img/icon256.png)
+
+Learn more about Markdown at [CommonMark](https://commonmark.org/).
+
+> Tip: use the toolbar for common Markdown inserts, then edit the generated syntax directly.
 `
 
 const VALID_THEMES: ThemeName[] = [
@@ -146,7 +210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveStatus: 'local-only',
   saveError: null,
   setActiveDocId: (docId) => {
-    set({ activeDocId: docId })
+    set(docId ? { activeDocId: docId, isHydrated: true } : { activeDocId: docId })
     if (docId) {
       void setActiveDocumentId(docId)
     }
@@ -179,6 +243,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastCloudSavedTitle: title,
       lastCloudSavedMarkdown: markdown,
       saveStatus: 'synced',
+      isHydrated: true,
     }),
   clearShareLink: () =>
     set({
@@ -206,16 +271,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ recentDocumentsState: 'loading' })
     try {
+      const { refreshRecentDocumentsForUser } = await import('../storage/documentSync')
       const recentDocuments = await refreshRecentDocumentsForUser(uid)
       const documents = await listDocuments()
       set({ recentDocuments, documents, recentDocumentsState: 'ready' })
     } catch (error) {
+      const { refreshLocalRecentDocuments } = await import('../storage/documentSync')
       const recentDocuments = await refreshLocalRecentDocuments()
       set({ recentDocuments, recentDocumentsState: 'error' })
       throw error
     }
   },
   refreshLocalRecentDocuments: async () => {
+    const { refreshLocalRecentDocuments } = await import('../storage/documentSync')
     const [recentDocuments, documents] = await Promise.all([
       refreshLocalRecentDocuments(),
       listDocuments(),
@@ -254,13 +322,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeDocId: null,
       activeShareId: null,
       draftTitle: 'Untitled Document',
-      draftMarkdown: '# Untitled Document\n\n',
+      draftMarkdown: STARTER_MARKDOWN,
       lastLocalSavedTitle: '',
       lastLocalSavedMarkdown: '',
       lastCloudSavedTitle: null,
       lastCloudSavedMarkdown: null,
       saveStatus: 'local-only',
       saveError: null,
+      isHydrated: true,
       mobileTab: 'write',
       desktopViewMode: 'split',
     })
@@ -299,6 +368,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastCloudSavedMarkdown: null,
       saveStatus: 'saved',
       saveError: null,
+      isHydrated: true,
       mobileTab: 'write',
     })
   },

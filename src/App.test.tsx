@@ -92,15 +92,15 @@ describe('App routing shell', () => {
     vi.mocked(updateSharedDocument).mockResolvedValue()
   })
 
-  it('renders the dashboard at root', () => {
+  it('renders the dashboard at root', async () => {
     window.history.pushState({}, '', '/')
     render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
-    expect(screen.getByText('MD Studio')).toBeInTheDocument()
-    expect(screen.getByText('Welcome!')).toBeInTheDocument()
+    expect(await screen.findByText('MD Studio')).toBeInTheDocument()
+    expect(await screen.findByText('Welcome!')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Write, preview, and manage Markdown documents.' })).toBeInTheDocument()
     expect(document.title).toBe('Dashboard | MD Studio')
   })
@@ -119,7 +119,7 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(screen.getByRole('status', { name: 'Loading dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: 'Loading dashboard' })).toBeInTheDocument()
     expect(screen.queryByText('MD Studio')).not.toBeInTheDocument()
     expect(screen.queryByText('Welcome!')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Get started' })).not.toBeInTheDocument()
@@ -153,7 +153,7 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(screen.getByRole('button', { name: 'Try without signing in' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Try without signing in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /New Blank Doc/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Import Markdown/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /View sample document/ })).toBeInTheDocument()
@@ -265,6 +265,27 @@ describe('App routing shell', () => {
       expect(window.location.pathname).toBe('/editor')
     })
     expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
+    expect(useAppStore.getState().draftMarkdown).toContain('Welcome to MD Studio')
+    expect(useAppStore.getState().activeDocId).toBeNull()
+  })
+
+  it('opens a fresh starter draft on direct editor visits instead of the active document', async () => {
+    const active = await createDocument({ title: 'Last Opened Doc', markdown: '# Last Opened Doc' })
+    await setActiveDocumentId(active.id)
+    window.history.pushState({}, '', '/editor')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await waitFor(() => {
+      expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
+    })
+    expect(useAppStore.getState().draftMarkdown).toContain('Welcome to MD Studio')
+    expect(useAppStore.getState().draftMarkdown).not.toBe('# Last Opened Doc')
+    expect(useAppStore.getState().activeDocId).toBeNull()
   })
 
   it('loads signed-in dashboard recent documents and opens one in the editor', async () => {
@@ -308,6 +329,24 @@ describe('App routing shell', () => {
       expect(window.location.pathname).toBe('/editor')
     })
     expect(useAppStore.getState().activeDocId).toBe(doc.id)
+  })
+
+  it('opens local document routes as the selected saved document', async () => {
+    const doc = await createDocument({ title: 'Route Doc', markdown: '# Route Doc\n\nSaved content.' })
+    window.history.pushState({}, '', `/doc/${doc.id}`)
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/editor')
+    })
+    expect(useAppStore.getState().activeDocId).toBe(doc.id)
+    expect(useAppStore.getState().draftTitle).toBe('Route Doc')
+    expect(useAppStore.getState().draftMarkdown).toBe('# Route Doc\n\nSaved content.')
   })
 
   it('shows signed-in dashboard empty and error states', async () => {
@@ -430,9 +469,11 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    expect(document.title).toBe('Markdown Rendering Test File | MD Studio')
+    await waitFor(() => {
+      expect(document.title).toBe('Untitled Document | MD Studio')
+    })
 
-    fireEvent.change(screen.getByDisplayValue('Markdown Rendering Test File'), { target: { value: 'Draft Rename' } })
+    fireEvent.change(screen.getByDisplayValue('Untitled Document'), { target: { value: 'Draft Rename' } })
 
     await waitFor(() => {
       expect(document.title).toBe('Draft Rename | MD Studio')
@@ -450,7 +491,7 @@ describe('App routing shell', () => {
     const previewButton = screen.getAllByRole('button', { name: 'Preview' })[0]
     fireEvent.click(previewButton)
     expect(previewButton).toHaveClass('active')
-    expect(screen.getByRole('heading', { level: 1, name: 'Markdown Rendering Test File' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Untitled Document' })).toBeInTheDocument()
   })
 
   it('only exposes split and preview desktop view modes', () => {
@@ -477,7 +518,7 @@ describe('App routing shell', () => {
 
     const sidebar = container.querySelector<HTMLElement>('.desktop-sidebar')!
     expect(within(sidebar).getByRole('heading', { name: 'Outline' })).toBeInTheDocument()
-    expect(within(sidebar).getByRole('button', { name: /Core markdown features/ })).toBeInTheDocument()
+    expect(within(sidebar).getByRole('button', { name: /What you can create/ })).toBeInTheDocument()
     expect(within(sidebar).queryByRole('button', { name: 'Documents' })).not.toBeInTheDocument()
     expect(within(sidebar).queryByRole('heading', { name: 'Recent Documents' })).not.toBeInTheDocument()
     expect(within(sidebar).queryByRole('button', { name: 'New' })).not.toBeInTheDocument()
@@ -510,6 +551,10 @@ describe('App routing shell', () => {
         <App />
       </BrowserRouter>,
     )
+
+    await waitFor(() => {
+      expect(consumer).not.toBeNull()
+    })
 
     const file = {
       name: 'explorer-file.md',
@@ -745,7 +790,7 @@ describe('App routing shell', () => {
     )
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0])
-    fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
+    fireEvent.click(screen.getByRole('button', { name: /What you can create/ }))
 
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: 'Preview' })[0]).toHaveClass('active')
@@ -761,7 +806,7 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Core markdown features/ }))
+    fireEvent.click(screen.getByRole('button', { name: /What you can create/ }))
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Split' })).toHaveClass('active')
@@ -785,13 +830,14 @@ describe('App routing shell', () => {
     fireEvent.click(newButton)
 
     expect(useAppStore.getState().draftTitle).toBe('Untitled Document')
-    expect(useAppStore.getState().draftMarkdown).toBe('# Untitled Document\n\n')
+    expect(useAppStore.getState().draftMarkdown).toContain('Welcome to MD Studio')
+    expect(useAppStore.getState().isHydrated).toBe(true)
     expect(useAppStore.getState().desktopViewMode).toBe('split')
   })
 
   it('opens new document options and uploads markdown from the topbar new menu', () => {
     window.history.pushState({}, '', '/editor')
-    useAppStore.setState({ saveStatus: 'saved' })
+    useAppStore.setState({ isHydrated: true, saveStatus: 'saved' })
     const { container } = render(
       <BrowserRouter>
         <App />
@@ -997,7 +1043,7 @@ describe('App routing shell', () => {
       </BrowserRouter>,
     )
 
-    const outlineRow = screen.getByRole('button', { name: /Core markdown features/ })
+    const outlineRow = screen.getByRole('button', { name: /What you can create/ })
 
     fireEvent.pointerDown(outlineRow, { button: 0, clientX: 24, clientY: 16 })
 
@@ -1313,14 +1359,14 @@ describe('App routing shell', () => {
     })
   })
 
-  it('renders local document route loading state', () => {
+  it('renders local document route loading state', async () => {
     window.history.pushState({}, '', '/doc/test-doc')
     render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     )
-    expect(screen.getByText(/Opening document/)).toBeInTheDocument()
+    expect(await screen.findByText(/Opening document/)).toBeInTheDocument()
     expect(screen.getByText('test-doc')).toBeInTheDocument()
   })
 

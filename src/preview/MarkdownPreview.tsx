@@ -1,5 +1,5 @@
 import React from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -20,6 +20,37 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
   markdown,
   theme,
 }: MarkdownPreviewProps) {
+  const components = useMemo(
+    () => ({
+      h1: HeadingWithSourceLine('h1'),
+      h2: HeadingWithSourceLine('h2'),
+      h3: HeadingWithSourceLine('h3'),
+      h4: HeadingWithSourceLine('h4'),
+      h5: HeadingWithSourceLine('h5'),
+      h6: HeadingWithSourceLine('h6'),
+      code(props: React.ComponentProps<'code'>) {
+        const { className, children } = props
+        const content = String(children ?? '').replace(/\n$/, '')
+        const language = className?.replace('language-', '') ?? ''
+        const isBlock = Boolean(className)
+
+        if (isBlock && language === 'mermaid') {
+          return <MermaidBlock code={content} theme={theme} />
+        }
+
+        if (isBlock) {
+          return <CodeBlock language={language} code={content} theme={theme} />
+        }
+
+        return <code className={className ? className : 'code-inline'}>{children}</code>
+      },
+      img(props: React.ComponentProps<'img'>) {
+        return <PreviewImage alt={props.alt ?? ''} src={props.src ?? ''} />
+      },
+    }),
+    [theme],
+  )
+
   return (
     <article className={`markdown-doc markdown-doc-${theme}`}>
       <ReactMarkdown
@@ -27,33 +58,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         urlTransform={(url) => sanitizeUrl(url)}
-        components={{
-          h1: HeadingWithSourceLine('h1'),
-          h2: HeadingWithSourceLine('h2'),
-          h3: HeadingWithSourceLine('h3'),
-          h4: HeadingWithSourceLine('h4'),
-          h5: HeadingWithSourceLine('h5'),
-          h6: HeadingWithSourceLine('h6'),
-          code(props) {
-            const { className, children } = props
-            const content = String(children ?? '').replace(/\n$/, '')
-            const language = className?.replace('language-', '') ?? ''
-            const isBlock = Boolean(className)
-
-            if (isBlock && language === 'mermaid') {
-              return <MermaidBlock code={content} theme={theme} />
-            }
-
-            if (isBlock) {
-              return <CodeBlock language={language} code={content} theme={theme} />
-            }
-
-            return <code className={className ? className : 'code-inline'}>{children}</code>
-          },
-          img(props) {
-            return <PreviewImage alt={props.alt ?? ''} src={props.src ?? ''} />
-          },
-        }}
+        components={components}
       >
         {markdown}
       </ReactMarkdown>
