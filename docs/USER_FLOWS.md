@@ -10,9 +10,9 @@ This document describes the current product behavior that should remain stable a
 4. `Save` writes the current title, markdown, and theme to IndexedDB.
 5. Signed-out users see `Sign in to see your backed up documents` in Recent Documents.
 6. Signed-in users see Recent Documents from a merged local/private-cloud view by content recency descending.
-7. Recent document rows show local/Firebase source icons and relative updated times.
+7. Dashboard recent-document rows show the relative content-updated time beneath the title and expose Preview, Share, and Delete actions directly on wider layouts. Phone layouts use an accessible three-dot menu for the same actions.
 8. Relative updated times refresh in the UI about once per minute, so `just now` advances to `1 min ago`, `2 mins ago`, and later units without requiring a document refresh.
-9. Opening a different document clears any active share link and loads that local document into the editor.
+9. Opening a different document restores its existing share link when present, otherwise clears the active share link, and loads the local document into the editor.
 10. If there are unsaved changes, opening another document, creating a new document, or importing a document asks whether to save, save locally, discard, or cancel.
 
 ## Desktop Authoring
@@ -83,7 +83,7 @@ Sharing requires Google sign-in.
 4. The local document is then marked as Firebase-backed with the returned share ID and owner UID.
 5. The returned share ID is stored in app state as the active share link.
 6. Once a link exists, the share dialog shows the read-only link and copy action, but does not show a create or update action.
-7. Copy Link writes the active share URL to the clipboard when available.
+7. Copy Link writes the document title, a newline, and the active share URL to the clipboard when available.
 
 Firestore is a published copy. The local IndexedDB document remains the canonical editable source.
 

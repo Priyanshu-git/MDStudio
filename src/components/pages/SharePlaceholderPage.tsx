@@ -11,6 +11,7 @@ import type { Document, SharedDocument, ThemeName } from '../../types'
 import { useAppStore } from '../../state/useAppStore'
 import { listenToAuthState, signInWithGoogle } from '../../firebase/auth'
 import { useAutoHideAppbar } from '../../hooks/useAutoHideAppbar'
+import { formatShareClipboardText } from '../../sharing/clipboard'
 
 const themeGroups = [
   {
@@ -309,7 +310,7 @@ export function SharePlaceholderPage() {
       return
     }
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      await navigator.clipboard.writeText(formatShareClipboardText(document?.title ?? 'Shared Document', shareUrl))
       setCopyState('copied')
     } catch {
       setCopyState('failed')

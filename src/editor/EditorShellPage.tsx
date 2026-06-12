@@ -40,6 +40,7 @@ import { MarkdownPreview } from '../preview/MarkdownPreview'
 import { useAppStore, hasUnsavedChanges } from '../state/useAppStore'
 import { getDocumentById, updateDocument } from '../storage/documents'
 import { publishSharedDocument, updateSharedDocument } from '../storage/shareDocuments'
+import { formatShareClipboardText } from '../sharing/clipboard'
 import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../firebase/auth'
 import { useAutoHideAppbar } from '../hooks/useAutoHideAppbar'
 import { MarkdownEditor, type EditorSelectionSnapshot, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -714,7 +715,7 @@ export function EditorShellPage() {
       return
     }
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      await navigator.clipboard.writeText(formatShareClipboardText(draftTitle, shareUrl))
       setCopyState('copied')
     } catch {
       setCopyState('failed')

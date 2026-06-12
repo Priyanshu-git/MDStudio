@@ -5,21 +5,28 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   ChevronDown,
+  Copy,
   Edit3,
+  Eye,
   FileText,
   FolderOpen,
   MoreVertical,
   Plus,
   Search,
+  Share2,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import { AccountButton, AccountMenu } from '../layout/AccountMenu'
 import { getSelectedThemeLabel, themeGroups, type AccountMenuView } from '../layout/accountMenuConfig'
-import { listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../../firebase/auth'
+import { getOwnerProfile, listenToAuthState, signInWithGoogle, signOutCurrentUser } from '../../firebase/auth'
 import { useRelativeTimeNow } from '../../editor/useRelativeTimeNow'
 import { useAppStore } from '../../state/useAppStore'
-import { deleteRecentDocument } from '../../storage/documentSync'
+import { backUpLocalDocument, deleteRecentDocument } from '../../storage/documentSync'
+import { getDocumentById, updateDocument } from '../../storage/documents'
+import { publishSharedDocument } from '../../storage/shareDocuments'
+import { formatShareClipboardText } from '../../sharing/clipboard'
 import type { RecentDocumentItem, RecentDocumentsState } from '../../types'
 
 type DashboardAuthStatus = 'loading' | 'signed-in' | 'signed-out'
@@ -55,11 +62,41 @@ function getUserFirstName(user: User): string {
   return firstName || 'there'
 }
 
+function getShareUrl(shareId: string): string {
+  const path = `/share/${shareId}`
+  return typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
+}
+
+function useIsPhoneViewport() {
+  const [isPhoneViewport, setIsPhoneViewport] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia('(max-width: 767px)').matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleChange = () => setIsPhoneViewport(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  return isPhoneViewport
+}
+
 export function HomePage() {
   const navigate = useNavigate()
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const accountRef = useRef<HTMLDivElement | null>(null)
   const newMenuRef = useRef<HTMLDivElement | null>(null)
+  const shareDialogCloseRef = useRef<HTMLButtonElement | null>(null)
+  const shareReturnFocusRef = useRef<HTMLElement | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [authStatus, setAuthStatus] = useState<DashboardAuthStatus>('loading')
   const [isLoaderVisible, setIsLoaderVisible] = useState(true)
@@ -70,7 +107,10 @@ export function HomePage() {
   const [accountMenuView, setAccountMenuView] = useState<AccountMenuView>('main')
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false)
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false)
-  const [openDocumentMenuId, setOpenDocumentMenuId] = useState<string | null>(null)
+  const [shareDocument, setShareDocument] = useState<RecentDocumentItem | null>(null)
+  const [isDashboardSharing, setIsDashboardSharing] = useState(false)
+  const [dashboardShareError, setDashboardShareError] = useState<string | null>(null)
+  const [dashboardCopyState, setDashboardCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const theme = useAppStore((state) => state.theme)
   const setTheme = useAppStore((state) => state.setTheme)
   const recentDocuments = useAppStore((state) => state.recentDocuments)
@@ -82,8 +122,12 @@ export function HomePage() {
   const openDocument = useAppStore((state) => state.openDocument)
   const importMarkdownDraft = useAppStore((state) => state.importMarkdownDraft)
   const refreshDocuments = useAppStore((state) => state.refreshDocuments)
+  const setMobileTab = useAppStore((state) => state.setMobileTab)
+  const setDesktopViewMode = useAppStore((state) => state.setDesktopViewMode)
   const now = useRelativeTimeNow()
   const selectedThemeLabel = getSelectedThemeLabel(theme)
+  const isDashboardShareOpen = Boolean(shareDocument)
+  const dashboardShareUrl = shareDocument?.sourceShareId ? getShareUrl(shareDocument.sourceShareId) : null
 
   const filteredDocuments = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -157,35 +201,24 @@ export function HomePage() {
   }, [isAccountMenuOpen])
 
   useEffect(() => {
-    if (!openDocumentMenuId) {
+    if (!isDashboardShareOpen) {
       return
     }
 
-    function closeDocumentMenu() {
-      setOpenDocumentMenuId(null)
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const element = event.target as HTMLElement | null
-      if (element?.closest('.dashboard-row-menu')) {
-        return
-      }
-      closeDocumentMenu()
-    }
+    shareDialogCloseRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        closeDocumentMenu()
+        setShareDocument(null)
       }
     }
 
-    document.addEventListener('pointerdown', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
+      shareReturnFocusRef.current?.focus()
     }
-  }, [openDocumentMenuId])
+  }, [isDashboardShareOpen])
 
   useEffect(() => {
     if (!isNewMenuOpen) {
@@ -289,7 +322,83 @@ export function HomePage() {
 
   async function handleOpenDocument(docId: string) {
     await openDocument(docId)
+    setDesktopViewMode('split')
+    setMobileTab('write')
     navigate('/editor', { state: { editorIntent: 'open-existing' } })
+  }
+
+  async function handlePreviewDocument(docId: string) {
+    await openDocument(docId)
+    setDesktopViewMode('preview')
+    setMobileTab('preview')
+    navigate('/editor', { state: { editorIntent: 'open-existing' } })
+  }
+
+  function handleOpenDashboardShare(item: RecentDocumentItem) {
+    shareReturnFocusRef.current = document.activeElement as HTMLElement | null
+    setShareDocument(item)
+    setDashboardShareError(null)
+    setDashboardCopyState('idle')
+  }
+
+  async function handleCreateDashboardShare() {
+    if (!user || !shareDocument) {
+      setDashboardShareError('Sign in with Google to share documents.')
+      return
+    }
+
+    const localDocumentId = shareDocument.localDocumentId ?? shareDocument.id
+    setIsDashboardSharing(true)
+    setDashboardShareError(null)
+    setDashboardCopyState('idle')
+
+    try {
+      const result = await publishSharedDocument({
+        title: shareDocument.title,
+        markdown: shareDocument.markdown,
+        sourceDocId: localDocumentId,
+        owner: getOwnerProfile(user),
+      })
+      await updateDocument(localDocumentId, {
+        source: 'firebase',
+        sourceShareId: result.shareId,
+        sourceOwnerUid: user.uid,
+      })
+      const localDocument = await getDocumentById(localDocumentId)
+      if (!localDocument) {
+        throw new Error('Local document unavailable after sharing.')
+      }
+      await backUpLocalDocument(user.uid, localDocument)
+      await refreshDocuments()
+      await refreshRecentDocuments(user.uid)
+      setShareDocument((current) => current?.id === shareDocument.id
+        ? {
+            ...current,
+            source: 'firebase',
+            sourceShareId: result.shareId,
+            sourceOwnerUid: user.uid,
+            syncStatus: 'backed-up',
+          }
+        : current)
+    } catch {
+      setDashboardShareError('Unable to share document. Please try again.')
+    } finally {
+      setIsDashboardSharing(false)
+    }
+  }
+
+  async function handleCopyDashboardShareUrl() {
+    if (!dashboardShareUrl || !shareDocument || !navigator.clipboard) {
+      setDashboardCopyState('failed')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(formatShareClipboardText(shareDocument.title, dashboardShareUrl))
+      setDashboardCopyState('copied')
+    } catch {
+      setDashboardCopyState('failed')
+    }
   }
 
   async function handleDeleteDocument(item: RecentDocumentItem) {
@@ -298,7 +407,6 @@ export function HomePage() {
     }
 
     setAuthError(null)
-    setOpenDocumentMenuId(null)
     try {
       await deleteRecentDocument(user?.uid ?? null, item)
       await refreshDocuments()
@@ -450,9 +558,9 @@ export function HomePage() {
             documents={filteredDocuments}
             state={recentDocumentsState}
             now={now}
-            openDocumentMenuId={openDocumentMenuId}
             onOpen={(id) => void handleOpenDocument(id)}
-            onToggleMenu={(id) => setOpenDocumentMenuId((openId) => (openId === id ? null : id))}
+            onPreview={(id) => void handlePreviewDocument(id)}
+            onShare={handleOpenDashboardShare}
             onDelete={(item) => void handleDeleteDocument(item)}
             onNew={handleNewDocument}
             onImport={handleImportClick}
@@ -510,6 +618,60 @@ export function HomePage() {
           </section>
         </section>
       )}
+
+      {shareDocument ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setShareDocument(null)}>
+          <section
+            className="dialog-sheet dashboard-share-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-share-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dashboard-share-heading">
+              <div>
+                <h2 id="dashboard-share-title">Share document</h2>
+                <p>{shareDocument.title}</p>
+              </div>
+              <button
+                ref={shareDialogCloseRef}
+                type="button"
+                className="icon-button"
+                aria-label="Close share dialog"
+                title="Close"
+                onClick={() => setShareDocument(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p>Anyone with this link can view this document. Only the creator can edit the original.</p>
+            {dashboardShareError ? <p className="error-text">{dashboardShareError}</p> : null}
+            {dashboardShareUrl ? (
+              <div className="share-link-row">
+                <input value={dashboardShareUrl} readOnly aria-label="Read-only share link" />
+                <button type="button" className="secondary-button" onClick={() => void handleCopyDashboardShareUrl()}>
+                  <Copy size={16} />
+                  Copy Link
+                </button>
+              </div>
+            ) : (
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => void handleCreateDashboardShare()}
+                  disabled={isDashboardSharing}
+                >
+                  <Share2 size={16} />
+                  {isDashboardSharing ? 'Sharing...' : 'Create Link'}
+                </button>
+              </div>
+            )}
+            {dashboardCopyState === 'copied' ? <p className="success-text">Link copied</p> : null}
+            {dashboardCopyState === 'failed' ? <p className="error-text">Copy failed</p> : null}
+          </section>
+        </div>
+      ) : null}
     </main>
   )
 }
@@ -555,9 +717,9 @@ function DashboardDocuments({
   documents,
   state,
   now,
-  openDocumentMenuId,
   onOpen,
-  onToggleMenu,
+  onPreview,
+  onShare,
   onDelete,
   onNew,
   onImport,
@@ -565,13 +727,78 @@ function DashboardDocuments({
   documents: RecentDocumentItem[]
   state: RecentDocumentsState
   now: number
-  openDocumentMenuId: string | null
   onOpen: (id: string) => void
-  onToggleMenu: (id: string) => void
+  onPreview: (id: string) => void
+  onShare: (item: RecentDocumentItem) => void
   onDelete: (item: RecentDocumentItem) => void
   onNew: () => void
   onImport: () => void
 }) {
+  const isPhoneViewport = useIsPhoneViewport()
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobileMenuTriggerRefs = useRef(new Map<string, HTMLButtonElement>())
+  const [openMobileMenuId, setOpenMobileMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!openMobileMenuId) {
+      return
+    }
+
+    const mobileMenuId = openMobileMenuId
+    mobileMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+
+    function closeMobileMenu(restoreFocus: boolean) {
+      const trigger = mobileMenuTriggerRefs.current.get(mobileMenuId)
+      setOpenMobileMenuId(null)
+      if (restoreFocus) {
+        trigger?.focus()
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const element = event.target as HTMLElement | null
+      if (element?.closest('.dashboard-mobile-row-menu')) {
+        return
+      }
+      closeMobileMenu(false)
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeMobileMenu(true)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [openMobileMenuId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleChange = () => {
+      if (!mediaQuery.matches) {
+        setOpenMobileMenuId(null)
+      }
+    }
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  function runMobileAction(docId: string, action: () => void) {
+    const trigger = mobileMenuTriggerRefs.current.get(docId)
+    setOpenMobileMenuId(null)
+    trigger?.focus()
+    action()
+  }
+
   return (
     <section className="dashboard-documents-card">
       <h2>Recent Documents</h2>
@@ -597,7 +824,6 @@ function DashboardDocuments({
         <div className="dashboard-document-list">
           {documents.map((doc) => {
             const updatedAt = doc.contentUpdatedAt ?? doc.updatedAt
-            const syncLabel = doc.syncStatus === 'backed-up' ? 'Backed up' : doc.syncStatus === 'conflict' ? 'Conflict' : 'Local only'
             return (
               <div key={doc.id} className="dashboard-document-row">
                 <button type="button" className="dashboard-document-main" onClick={() => onOpen(doc.id)}>
@@ -606,30 +832,90 @@ function DashboardDocuments({
                   </span>
                   <span className="dashboard-document-copy">
                     <strong>{doc.title}</strong>
-                    <small>{syncLabel}</small>
+                    <small className="dashboard-document-time">{formatRelativeTime(updatedAt, now)}</small>
                   </span>
-                  <span className="dashboard-document-time">{formatRelativeTime(updatedAt, now)}</span>
                 </button>
-                <div className="dashboard-row-menu">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={`${doc.title} actions`}
-                    aria-haspopup="menu"
-                    aria-expanded={openDocumentMenuId === doc.id}
-                    onClick={() => onToggleMenu(doc.id)}
-                  >
-                    <MoreVertical size={18} />
-                  </button>
-                  {openDocumentMenuId === doc.id ? (
-                    <div className="dashboard-row-popover" role="menu" aria-label={`${doc.title} actions`}>
-                      <button type="button" role="menuitem" onClick={() => onDelete(doc)}>
-                        <Trash2 size={15} />
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                {isPhoneViewport ? (
+                  <div className="dashboard-mobile-row-menu">
+                    <button
+                      ref={(node) => {
+                        if (node) {
+                          mobileMenuTriggerRefs.current.set(doc.id, node)
+                        } else {
+                          mobileMenuTriggerRefs.current.delete(doc.id)
+                        }
+                      }}
+                      type="button"
+                      className="secondary-button dashboard-mobile-row-trigger"
+                      aria-label={`${doc.title} actions`}
+                      aria-haspopup="menu"
+                      aria-expanded={openMobileMenuId === doc.id}
+                      title={`${doc.title} actions`}
+                      onClick={() => setOpenMobileMenuId((openId) => openId === doc.id ? null : doc.id)}
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    {openMobileMenuId === doc.id ? (
+                      <div
+                        ref={mobileMenuRef}
+                        className="dashboard-mobile-row-popover"
+                        role="menu"
+                        aria-label={`${doc.title} actions`}
+                      >
+                        <button type="button" role="menuitem" onClick={() => runMobileAction(doc.id, () => onPreview(doc.id))}>
+                          <Eye size={16} />
+                          Preview
+                        </button>
+                        <button type="button" role="menuitem" onClick={() => runMobileAction(doc.id, () => onShare(doc))}>
+                          <Share2 size={16} />
+                          Share
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="dashboard-mobile-row-delete"
+                          onClick={() => runMobileAction(doc.id, () => onDelete(doc))}
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="dashboard-document-actions" aria-label={`${doc.title} actions`}>
+                    <button
+                      type="button"
+                      className="secondary-button dashboard-document-action"
+                      aria-label={`Preview ${doc.title}`}
+                      title={`Preview ${doc.title}`}
+                      onClick={() => onPreview(doc.id)}
+                    >
+                      <Eye size={16} />
+                      <span className="dashboard-document-action-label">Preview</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button dashboard-document-action"
+                      aria-label={`Share ${doc.title}`}
+                      title={`Share ${doc.title}`}
+                      onClick={() => onShare(doc)}
+                    >
+                      <Share2 size={16} />
+                      <span className="dashboard-document-action-label">Share</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button dashboard-document-action dashboard-document-action-danger"
+                      aria-label={`Delete ${doc.title}`}
+                      title={`Delete ${doc.title}`}
+                      onClick={() => onDelete(doc)}
+                    >
+                      <Trash2 size={16} />
+                      <span className="dashboard-document-action-label">Delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

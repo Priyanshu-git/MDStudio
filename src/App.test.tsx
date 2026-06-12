@@ -9,12 +9,13 @@ import { listenToAuthState, signInWithGoogle, signOutCurrentUser } from './fireb
 import { useAppStore } from './state/useAppStore'
 import { db } from './storage/db'
 import { createDocument, setActiveDocumentId } from './storage/documents'
-import { backUpLocalDocument, refreshRecentDocumentsForUser } from './storage/documentSync'
+import { backUpLocalDocument, deleteRecentDocument, refreshRecentDocumentsForUser } from './storage/documentSync'
 import { getSharedDocumentById, publishSharedDocument, updateSharedDocument } from './storage/shareDocuments'
 
 const authMockState = vi.hoisted(() => ({
   currentUser: null as unknown,
 }))
+const clipboardWriteText = vi.fn()
 
 vi.mock('./storage/shareDocuments', () => ({
   publishSharedDocument: vi.fn(),
@@ -88,6 +89,10 @@ describe('App routing shell', () => {
       saveError: null,
     })
     HTMLElement.prototype.scrollTo = vi.fn() as unknown as typeof HTMLElement.prototype.scrollTo
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
+    })
     document.title = 'MD Studio'
     vi.mocked(publishSharedDocument).mockResolvedValue({ shareId: 'share-id' })
     vi.mocked(getSharedDocumentById).mockResolvedValue(null)
@@ -331,6 +336,293 @@ describe('App routing shell', () => {
       expect(window.location.pathname).toBe('/editor')
     })
     expect(useAppStore.getState().activeDocId).toBe(doc.id)
+    expect(useAppStore.getState().desktopViewMode).toBe('split')
+    expect(useAppStore.getState().mobileTab).toBe('write')
+  })
+
+  it('shows direct dashboard actions with one relative timestamp on wider layouts', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const doc = await createDocument({ title: 'Action Notes', markdown: '# Action Notes' })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([
+      {
+        id: doc.id,
+        localDocumentId: doc.id,
+        title: doc.title,
+        markdown: doc.markdown,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        contentUpdatedAt: doc.contentUpdatedAt,
+        source: 'firebase',
+        syncStatus: 'backed-up',
+      },
+    ])
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    const rowButton = (await screen.findAllByRole('button', { name: /Action Notes/ }))
+      .find((button) => button.classList.contains('dashboard-document-main'))!
+
+    expect(within(rowButton).getByText('just now')).toBeInTheDocument()
+    expect(screen.queryByText('Backed up')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Preview Action Notes' })).toHaveAttribute('title', 'Preview Action Notes')
+    expect(screen.getByRole('button', { name: 'Share Action Notes' })).toHaveAttribute('title', 'Share Action Notes')
+    expect(screen.getByRole('button', { name: 'Delete Action Notes' })).toHaveAttribute('title', 'Delete Action Notes')
+    expect(screen.queryByRole('button', { name: 'Action Notes actions' })).not.toBeInTheDocument()
+  })
+
+  it('uses a three-dot options menu for document actions on phone layouts', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    mockMobileViewport(true)
+    const doc = await createDocument({ title: 'Mobile Notes', markdown: '# Mobile Notes' })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([
+      {
+        id: doc.id,
+        localDocumentId: doc.id,
+        title: doc.title,
+        markdown: doc.markdown,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        contentUpdatedAt: doc.contentUpdatedAt,
+        source: doc.source,
+        syncStatus: 'local-only',
+      },
+    ])
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    expect(screen.queryByRole('button', { name: 'Preview Mobile Notes' })).not.toBeInTheDocument()
+
+    const menuButton = await screen.findByRole('button', { name: 'Mobile Notes actions' }, { timeout: 5000 })
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(menuButton)
+
+    const menu = screen.getByRole('menu', { name: 'Mobile Notes actions' })
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true')
+    expect(within(menu).getByRole('menuitem', { name: 'Preview' })).toHaveFocus()
+    expect(within(menu).getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menu', { name: 'Mobile Notes actions' })).not.toBeInTheDocument()
+    expect(menuButton).toHaveFocus()
+  })
+
+  it('opens dashboard preview in preview mode on desktop and mobile', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const doc = await createDocument({ title: 'Preview Notes', markdown: '# Preview Notes' })
+    const recent = {
+      id: doc.id,
+      localDocumentId: doc.id,
+      title: doc.title,
+      markdown: doc.markdown,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      contentUpdatedAt: doc.contentUpdatedAt,
+      source: doc.source,
+      syncStatus: 'local-only' as const,
+    }
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([recent])
+    window.history.pushState({}, '', '/')
+
+    const firstRender = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Preview Notes' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/editor'))
+    expect(useAppStore.getState().desktopViewMode).toBe('preview')
+    expect(useAppStore.getState().mobileTab).toBe('preview')
+
+    firstRender.unmount()
+    window.history.pushState({}, '', '/')
+    mockMobileViewport(true)
+    useAppStore.setState({ isHydrated: false, desktopViewMode: 'split', mobileTab: 'write' })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([recent])
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Notes actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Preview' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/editor'))
+    expect(useAppStore.getState().desktopViewMode).toBe('preview')
+    expect(useAppStore.getState().mobileTab).toBe('preview')
+  })
+
+  it('shares dashboard documents, reuses existing links, and copies title plus URL', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const existing = await createDocument({
+      title: 'Already Shared',
+      markdown: '# Already Shared',
+      source: 'firebase',
+      sourceShareId: 'existing-share',
+      sourceOwnerUid: 'user-1',
+    })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([
+      {
+        id: existing.id,
+        localDocumentId: existing.id,
+        title: existing.title,
+        markdown: existing.markdown,
+        createdAt: existing.createdAt,
+        updatedAt: existing.updatedAt,
+        contentUpdatedAt: existing.contentUpdatedAt,
+        sourceShareId: 'existing-share',
+        sourceOwnerUid: 'user-1',
+        source: 'firebase',
+        syncStatus: 'backed-up',
+      },
+    ])
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    const shareButton = await screen.findByRole('button', { name: 'Share Already Shared' })
+    shareButton.focus()
+    fireEvent.click(shareButton)
+    expect(screen.getByLabelText('Read-only share link')).toHaveValue('http://localhost:3000/share/existing-share')
+    expect(screen.queryByRole('button', { name: 'Create Link' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close share dialog' })).toHaveFocus())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Link' }))
+    await waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith('Already Shared\nhttp://localhost:3000/share/existing-share')
+    })
+    expect(publishSharedDocument).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close share dialog' }))
+    await waitFor(() => expect(shareButton).toHaveFocus())
+  })
+
+  it('creates a dashboard share link and keeps publish failures in the dialog', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const doc = await createDocument({ title: 'New Share', markdown: '# New Share' })
+    const recent = {
+      id: doc.id,
+      localDocumentId: doc.id,
+      title: doc.title,
+      markdown: doc.markdown,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      contentUpdatedAt: doc.contentUpdatedAt,
+      source: doc.source,
+      syncStatus: 'local-only' as const,
+    }
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([recent])
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Share New Share' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Link' }))
+
+    expect(await screen.findByLabelText('Read-only share link')).toHaveValue('http://localhost:3000/share/share-id')
+    expect(publishSharedDocument).toHaveBeenCalledTimes(1)
+    expect(backUpLocalDocument).toHaveBeenCalled()
+    await waitFor(async () => {
+      expect(await db.documents.get(doc.id)).toEqual(expect.objectContaining({ sourceShareId: 'share-id' }))
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close share dialog' }))
+    vi.mocked(publishSharedDocument).mockRejectedValueOnce(new Error('publish failed'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Share New Share' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Link' }))
+    expect(await screen.findByText('Unable to share document. Please try again.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Share document' })).toBeInTheDocument()
+  })
+
+  it('keeps dashboard deletion behind confirmation', async () => {
+    authMockState.currentUser = {
+      uid: 'user-1',
+      displayName: 'Ada',
+      email: 'ada@example.com',
+      photoURL: null,
+    }
+    const doc = await createDocument({ title: 'Delete Notes', markdown: '# Delete Notes' })
+    vi.mocked(refreshRecentDocumentsForUser).mockResolvedValue([
+      {
+        id: doc.id,
+        localDocumentId: doc.id,
+        title: doc.title,
+        markdown: doc.markdown,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        contentUpdatedAt: doc.contentUpdatedAt,
+        source: doc.source,
+        syncStatus: 'local-only',
+      },
+    ])
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    window.history.pushState({}, '', '/')
+
+    render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Hi, Ada' })
+    const deleteButton = await screen.findByRole('button', { name: 'Delete Delete Notes' })
+    fireEvent.click(deleteButton)
+    expect(deleteRecentDocument).not.toHaveBeenCalled()
+
+    fireEvent.click(deleteButton)
+    await waitFor(() => expect(deleteRecentDocument).toHaveBeenCalledWith('user-1', expect.objectContaining({ id: doc.id })))
+    expect(confirm).toHaveBeenCalledTimes(2)
   })
 
   it('opens local document routes as the selected saved document', async () => {

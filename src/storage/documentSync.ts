@@ -22,6 +22,8 @@ function toRecentItem(doc: Document, syncStatus: RecentDocumentItem['syncStatus'
     updatedAt: doc.updatedAt,
     contentUpdatedAt: documentContentTimestamp(doc),
     source: doc.cloudDocumentId ? 'firebase' : doc.source,
+    sourceShareId: doc.sourceShareId,
+    sourceOwnerUid: doc.sourceOwnerUid,
     syncStatus,
   }
 }

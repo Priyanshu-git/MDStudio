@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { useAppStore } from './useAppStore'
 import { db } from '../storage/db'
+import { createDocument } from '../storage/documents'
 
 describe('App Store (Zustand)', () => {
   beforeEach(async () => {
@@ -75,6 +76,25 @@ describe('App Store (Zustand)', () => {
         sourceShareId: 'share-1',
       }),
     )
+  })
+
+  it('restores a saved document share id when opening it', async () => {
+    const doc = await createDocument({
+      title: 'Shared Again',
+      markdown: '# Shared Again',
+      source: 'firebase',
+      sourceShareId: 'share-existing',
+      sourceOwnerUid: 'user-1',
+    })
+
+    await useAppStore.getState().openDocument(doc.id)
+
+    expect(useAppStore.getState()).toEqual(expect.objectContaining({
+      activeShareId: 'share-existing',
+      lastCloudSavedTitle: 'Shared Again',
+      lastCloudSavedMarkdown: '# Shared Again',
+      saveStatus: 'synced',
+    }))
   })
 
   it('updates and persists theme', async () => {

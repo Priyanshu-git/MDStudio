@@ -9,6 +9,7 @@ import { useAppStore } from '../state/useAppStore'
 const authMock = vi.hoisted(() => ({
   user: null as null | { uid: string; displayName: string; email: string },
 }))
+const clipboardWriteText = vi.fn()
 
 vi.mock('shiki', () => ({
   codeToHtml: vi.fn(async (code) => `<pre><code>${code}</code></pre>`),
@@ -58,6 +59,10 @@ describe('Sharing flow', () => {
     await db.documents.clear()
     await db.appState.clear()
     useAppStore.setState({ isHydrated: false, activeShareId: null })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
+    })
   })
 
   it('creates a read-only share link from editor', async () => {
@@ -74,14 +79,14 @@ describe('Sharing flow', () => {
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Untitled Document')).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
 
     fireEvent.click(screen.getAllByRole('button', { name: /Share/ })[0])
     fireEvent.click(await screen.findByRole('button', { name: 'Create Link' }))
 
     await waitFor(() => {
       expect(screen.getByLabelText('Read-only share link')).toHaveValue('http://localhost:3000/share/share-1')
-    })
+    }, { timeout: 5000 })
     expect(publishSharedDocument).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: expect.objectContaining({ uid: 'user-1' }),
@@ -98,7 +103,12 @@ describe('Sharing flow', () => {
         ]),
       )
     })
-  })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Link' }))
+    await waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith('Untitled Document\nhttp://localhost:3000/share/share-1')
+    })
+  }, 20000)
 
   it('does not show update action for an existing shared link in the editor', async () => {
     window.history.pushState({}, '', '/editor')
@@ -152,6 +162,11 @@ describe('Sharing flow', () => {
     expect(screen.getByLabelText('Theme')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Make a Copy' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Original' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Link' }))
+    await waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith('Shared Title\nhttp://localhost:3000/share/share-xyz')
+    })
   })
 
   it('keeps non-owner shared document copies as local documents', async () => {

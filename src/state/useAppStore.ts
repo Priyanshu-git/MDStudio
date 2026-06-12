@@ -307,13 +307,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({
       activeDocId: doc.id,
+      activeShareId: doc.sourceShareId ?? null,
       draftTitle: doc.title,
       draftMarkdown: doc.markdown,
       lastLocalSavedTitle: doc.title,
       lastLocalSavedMarkdown: doc.markdown,
+      lastCloudSavedTitle: doc.sourceShareId ? doc.title : null,
+      lastCloudSavedMarkdown: doc.sourceShareId ? doc.markdown : null,
       theme,
       documents,
-      saveStatus: 'saved',
+      saveStatus: doc.sourceShareId ? 'synced' : 'saved',
       isHydrated: true,
     })
   },
@@ -359,14 +362,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     await setActiveDocumentId(doc.id)
     set({
       activeDocId: doc.id,
-      activeShareId: null,
+      activeShareId: doc.sourceShareId ?? null,
       draftTitle: doc.title,
       draftMarkdown: doc.markdown,
       lastLocalSavedTitle: doc.title,
       lastLocalSavedMarkdown: doc.markdown,
-      lastCloudSavedTitle: null,
-      lastCloudSavedMarkdown: null,
-      saveStatus: 'saved',
+      lastCloudSavedTitle: doc.sourceShareId ? doc.title : null,
+      lastCloudSavedMarkdown: doc.sourceShareId ? doc.markdown : null,
+      saveStatus: doc.sourceShareId ? 'synced' : 'saved',
       saveError: null,
       isHydrated: true,
       mobileTab: 'write',

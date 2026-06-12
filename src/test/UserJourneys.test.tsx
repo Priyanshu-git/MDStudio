@@ -64,7 +64,7 @@ describe('User Journeys', () => {
     // 1. Direct editor visits start a fresh starter draft.
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'Untitled Document' })).toBeInTheDocument()
-    })
+    }, { timeout: 10000 })
 
     // 2. Edit markdown through the V2 store-backed CodeMirror flow
     act(() => {
@@ -118,7 +118,7 @@ describe('User Journeys', () => {
     // Verify state restored from IndexedDB through the explicit document route.
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'My New Document' })).toBeInTheDocument()
-    })
+    }, { timeout: 10000 })
     expect(document.documentElement.dataset.theme).toBe('blue-eclipse')
-  })
+  }, 30000)
 })

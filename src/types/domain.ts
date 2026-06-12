@@ -53,6 +53,8 @@ export type RecentDocumentItem = {
   contentUpdatedAt?: number
   localDocumentId?: string
   cloudDocumentId?: string
+  sourceShareId?: string
+  sourceOwnerUid?: string
   source: DocumentSource
   syncStatus: RecentDocumentSyncStatus
 }
