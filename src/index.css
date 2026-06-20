@@ -16,10 +16,17 @@
   --success: #16a34a;
   --danger: #b91c1c;
   --warning: #b45309;
-  --code-bg: #111827;
-  --code-text: #e5e7eb;
-  --code-toolbar-bg: #172033;
-  --code-gutter-bg: #172033;
+  --code-bg: #f6f8fa;
+  --code-text: #24292f;
+  --code-toolbar-bg: #f6f8fa;
+  --code-gutter-bg: #f6f8fa;
+  --code-token-keyword: #cf222e;
+  --code-token-type: #953800;
+  --code-token-property: #953800;
+  --code-token-primitive: #0550ae;
+  --code-token-string: #0a3069;
+  --code-token-comment: #6e7781;
+  --code-token-punctuation: #24292f;
   --code-inline-bg: rgba(7, 87, 255, 0.09);
   --hover-bg: rgba(7, 87, 255, 0.08);
   --active-bg: rgba(7, 87, 255, 0.1);
@@ -48,10 +55,17 @@ html[data-theme="github-light"] {
   --success: #16a34a;
   --danger: #b91c1c;
   --warning: #b45309;
-  --code-bg: #111827;
-  --code-text: #e5e7eb;
-  --code-toolbar-bg: #172033;
-  --code-gutter-bg: #172033;
+  --code-bg: #f6f8fa;
+  --code-text: #24292f;
+  --code-toolbar-bg: #f6f8fa;
+  --code-gutter-bg: #f6f8fa;
+  --code-token-keyword: #cf222e;
+  --code-token-type: #953800;
+  --code-token-property: #953800;
+  --code-token-primitive: #0550ae;
+  --code-token-string: #0a3069;
+  --code-token-comment: #6e7781;
+  --code-token-punctuation: #24292f;
   --code-inline-bg: rgba(7, 87, 255, 0.09);
   --hover-bg: rgba(7, 87, 255, 0.08);
   --active-bg: rgba(7, 87, 255, 0.1);
@@ -83,6 +97,13 @@ html[data-theme="github-dark"] {
   --code-text: #e6edf3;
   --code-toolbar-bg: #0b1320;
   --code-gutter-bg: #0b1320;
+  --code-token-keyword: #ff7b72;
+  --code-token-type: #ffa657;
+  --code-token-property: #ffa657;
+  --code-token-primitive: #79c0ff;
+  --code-token-string: #a5d6ff;
+  --code-token-comment: #8b949e;
+  --code-token-punctuation: #e6edf3;
   --code-inline-bg: rgba(47, 129, 247, 0.16);
   --hover-bg: rgba(47, 129, 247, 0.14);
   --active-bg: rgba(47, 129, 247, 0.18);
@@ -111,10 +132,17 @@ html[data-theme="pastel-mint"] {
   --success: #5b86d6;
   --danger: #bf3f57;
   --warning: #b66c2f;
-  --code-bg: #1b2330;
-  --code-text: #eaf1f7;
-  --code-toolbar-bg: #223044;
-  --code-gutter-bg: #223044;
+  --code-bg: #f0f3ff;
+  --code-text: #21313b;
+  --code-toolbar-bg: #f0f3ff;
+  --code-gutter-bg: #f0f3ff;
+  --code-token-keyword: #cf222e;
+  --code-token-type: #953800;
+  --code-token-property: #953800;
+  --code-token-primitive: #0550ae;
+  --code-token-string: #0a3069;
+  --code-token-comment: #6e7781;
+  --code-token-punctuation: #21313b;
   --code-inline-bg: rgba(139, 124, 246, 0.13);
   --hover-bg: rgba(139, 124, 246, 0.1);
   --active-bg: rgba(139, 124, 246, 0.16);
@@ -143,10 +171,17 @@ html[data-theme="minimal-ivory"] {
   --success: #4c8a58;
   --danger: #a23f33;
   --warning: #a55f2a;
-  --code-bg: #2f2923;
-  --code-text: #f5ead9;
-  --code-toolbar-bg: #3a3028;
-  --code-gutter-bg: #3a3028;
+  --code-bg: #f2e7d5;
+  --code-text: #312820;
+  --code-toolbar-bg: #f2e7d5;
+  --code-gutter-bg: #f2e7d5;
+  --code-token-keyword: #9b1c2f;
+  --code-token-type: #874719;
+  --code-token-property: #874719;
+  --code-token-primitive: #075985;
+  --code-token-string: #7c2d12;
+  --code-token-comment: #786b5c;
+  --code-token-punctuation: #312820;
   --code-inline-bg: rgba(165, 95, 42, 0.13);
   --hover-bg: rgba(165, 95, 42, 0.1);
   --active-bg: rgba(165, 95, 42, 0.16);
@@ -179,6 +214,13 @@ html[data-theme="one-dark"] {
   --code-text: #dce3ec;
   --code-toolbar-bg: #21252b;
   --code-gutter-bg: #21252b;
+  --code-token-keyword: #c678dd;
+  --code-token-type: #e5c07b;
+  --code-token-property: #e06c75;
+  --code-token-primitive: #e5c07b;
+  --code-token-string: #98c379;
+  --code-token-comment: #7f848e;
+  --code-token-punctuation: #abb2bf;
   --code-inline-bg: rgba(217, 132, 63, 0.16);
   --hover-bg: rgba(217, 132, 63, 0.13);
   --active-bg: rgba(217, 132, 63, 0.18);
@@ -212,6 +254,13 @@ html[data-theme="blue-eclipse"] {
   --code-text: #dadaee;
   --code-toolbar-bg: #1a1a3d;
   --code-gutter-bg: #1a1a3d;
+  --code-token-keyword: #c792ea;
+  --code-token-type: #ffcb6b;
+  --code-token-property: #f78c6c;
+  --code-token-primitive: #82aaff;
+  --code-token-string: #c3e88d;
+  --code-token-comment: #8686ac;
+  --code-token-punctuation: #dadaee;
   --code-inline-bg: rgba(122, 162, 255, 0.16);
   --hover-bg: rgba(122, 162, 255, 0.13);
   --active-bg: rgba(122, 162, 255, 0.2);
@@ -1429,10 +1478,63 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 8px;
   color: var(--muted);
-  background: var(--code-toolbar-bg);
+  background: var(--code-bg);
+}
+
+.code-language {
+  line-height: 1;
+}
+
+.code-copy-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code-copy-status {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border-radius: 6px;
+  padding: 0 8px;
+  color: #ffffff;
+  background: #374151;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.code-copy-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.code-copy-button:hover {
+  color: var(--text);
+  background: var(--hover-bg);
+}
+
+.code-copy-button.copied {
+  color: #22c55e;
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+}
+
+.code-copy-button.copied:hover {
+  color: #22c55e;
+  background: color-mix(in srgb, #22c55e 18%, transparent);
 }
 
 .toolbar-actions {
@@ -1442,17 +1544,17 @@ a {
 
 .code-content {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
 }
 
 .line-number-gutter {
   margin: 0;
-  padding: 12px 10px;
+  padding: 8px 6px;
   font-family: var(--font-code);
   font-size: var(--font-code-size);
   text-align: right;
   color: var(--editor-gutter);
-  background: var(--code-gutter-bg);
+  background: var(--code-bg);
   user-select: none;
 }
 
@@ -1463,10 +1565,44 @@ a {
 
 .code-highlight pre {
   margin: 0;
-  padding: 12px;
+  padding: 8px 12px;
   font-family: var(--font-code);
   font-size: var(--font-code-size);
   line-height: 1.6;
+  background: transparent !important;
+}
+
+.code-highlight code {
+  background: transparent !important;
+}
+
+.code-fallback-highlight .code-token.keyword {
+  color: var(--code-token-keyword);
+}
+
+.code-fallback-highlight .code-token.type-name {
+  color: var(--code-token-type);
+}
+
+.code-fallback-highlight .code-token.property {
+  color: var(--code-token-property);
+}
+
+.code-fallback-highlight .code-token.primitive,
+.code-fallback-highlight .code-token.number {
+  color: var(--code-token-primitive);
+}
+
+.code-fallback-highlight .code-token.string {
+  color: var(--code-token-string);
+}
+
+.code-fallback-highlight .code-token.comment {
+  color: var(--code-token-comment);
+}
+
+.code-fallback-highlight .code-token.punctuation {
+  color: var(--code-token-punctuation);
 }
 
 .mermaid-block > div:last-child {

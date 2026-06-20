@@ -29,7 +29,7 @@
 
 ## Theme Mapping
 
-- `github-dark` maps Shiki to `github-dark`.
+- `github-dark` maps Shiki to `github-dark-default`.
 - `one-dark` and `blue-eclipse` map Shiki to `one-dark-pro`.
 - Light themes map Shiki to `github-light`.
 - Mermaid uses `dark` for `github-dark`, `one-dark`, and `blue-eclipse`; other themes use `default`.

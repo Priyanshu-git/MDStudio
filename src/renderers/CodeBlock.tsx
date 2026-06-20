@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Copy } from 'lucide-react'
 import type { ThemeName } from '../types'
 
 type CodeBlockProps = {
@@ -10,15 +11,16 @@ type CodeBlockProps = {
 }
 
 type ShikiModule = typeof import('shiki')
+type CopyState = 'idle' | 'copied' | 'failed'
 
 const highlightedCache = new Map<string, string>()
 let shikiModulePromise: Promise<ShikiModule> | null = null
 
 function shikiThemeForAppTheme(theme: ThemeName): string {
-  return theme === 'one-dark' || theme === 'blue-eclipse'
-    ? 'one-dark-pro'
-    : theme === 'github-dark'
-      ? 'github-dark'
+  return theme === 'github-dark'
+    ? 'github-dark-default'
+    : theme === 'one-dark' || theme === 'blue-eclipse'
+      ? 'one-dark-pro'
       : 'github-light'
 }
 
@@ -32,6 +34,60 @@ function escapeHtml(text: string): string {
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
+}
+
+function fallbackTokenClass(token: string, previousToken: string): string | null {
+  if (/^\s+$/.test(token)) {
+    return null
+  }
+  if (token.startsWith('//')) {
+    return 'comment'
+  }
+  if (/^["'`]/.test(token)) {
+    return 'string'
+  }
+  if (/^\d/.test(token)) {
+    return 'number'
+  }
+  if (/^(type|interface|const|let|var|function|return|if|else|for|while|class|extends|import|export|from|as|async|await|new|try|catch|throw)$/.test(token)) {
+    return 'keyword'
+  }
+  if (/^(string|number|boolean|void|null|undefined|unknown|never|any|true|false)$/.test(token)) {
+    return 'primitive'
+  }
+  if (/^[A-Za-z_$][\w$]*$/.test(token) && previousToken === 'type') {
+    return 'type-name'
+  }
+  if (/^[A-Za-z_$][\w$]*$/.test(token)) {
+    return 'property'
+  }
+  if (/^[=:{}()[\],.;<>+\-*/|&!?]+$/.test(token)) {
+    return 'punctuation'
+  }
+  return null
+}
+
+function fallbackCodeToHtml(code: string): string {
+  const tokenPattern =
+    /(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b[A-Za-z_$][\w$]*\b|\d+(?:\.\d+)?|[=:{}()[\],.;<>+\-*/|&!?]+|\s+)/gm
+
+  const lines = code.split('\n').map((line) => {
+    let previousToken = ''
+    const highlighted = Array.from(line.matchAll(tokenPattern))
+      .map((match) => {
+        const token = match[0]
+        const tokenClass = fallbackTokenClass(token, previousToken)
+        if (token.trim()) {
+          previousToken = token
+        }
+        const escapedToken = escapeHtml(token)
+        return tokenClass ? `<span class="code-token ${tokenClass}">${escapedToken}</span>` : escapedToken
+      })
+      .join('')
+    return `<span class="line">${highlighted}</span>`
+  })
+
+  return `<pre class="code-fallback-highlight"><code>${lines.join('\n')}</code></pre>`
 }
 
 export function CodeBlock({
@@ -48,6 +104,8 @@ export function CodeBlock({
     [code, normalizedLanguage, shikiTheme],
   )
   const [highlightedResult, setHighlightedResult] = useState<{ key: string; html: string } | null>(null)
+  const [copyState, setCopyState] = useState<CopyState>('idle')
+  const copyResetTimer = useRef<number | null>(null)
   const lineNumbers = useMemo(
     () =>
       code
@@ -78,7 +136,7 @@ export function CodeBlock({
           setHighlightedResult({ key: cacheKey, html })
         }
       } catch {
-        const fallback = `<pre><code>${escapeHtml(code)}</code></pre>`
+        const fallback = fallbackCodeToHtml(code)
         if (!cancelled) {
           highlightedCache.set(cacheKey, fallback)
           setHighlightedResult({ key: cacheKey, html: fallback })
@@ -92,9 +150,35 @@ export function CodeBlock({
     }
   }, [cacheKey, code, normalizedLanguage, shikiTheme])
 
+  useEffect(() => {
+    return () => {
+      if (copyResetTimer.current !== null) {
+        window.clearTimeout(copyResetTimer.current)
+      }
+    }
+  }, [])
+
+  function scheduleCopyStateReset() {
+    if (copyResetTimer.current !== null) {
+      window.clearTimeout(copyResetTimer.current)
+    }
+    copyResetTimer.current = window.setTimeout(() => {
+      setCopyState('idle')
+      copyResetTimer.current = null
+    }, 2000)
+  }
+
   const onCopy = async () => {
-    if (navigator.clipboard) {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard unavailable')
+      }
       await navigator.clipboard.writeText(code)
+      setCopyState('copied')
+    } catch {
+      setCopyState('failed')
+    } finally {
+      scheduleCopyStateReset()
     }
   }
 
@@ -103,9 +187,22 @@ export function CodeBlock({
       <div className="code-toolbar">
         <span className="code-language">{normalizedLanguage}</span>
         {showCopyButton ? (
-          <button type="button" className="tab-button" onClick={onCopy}>
-            Copy
-          </button>
+          <div className="code-copy-actions">
+            {copyState === 'copied' ? (
+              <span className="code-copy-status" aria-live="polite">
+                Copied!
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className={copyState === 'copied' ? 'code-copy-button copied' : 'code-copy-button'}
+              aria-label={copyState === 'copied' ? 'Code copied' : 'Copy code'}
+              title={copyState === 'copied' ? 'Code copied' : 'Copy code'}
+              onClick={onCopy}
+            >
+              {copyState === 'copied' ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+            </button>
+          </div>
         ) : null}
       </div>
       <div className="code-content">

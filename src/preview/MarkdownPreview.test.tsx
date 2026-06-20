@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MarkdownPreview } from './MarkdownPreview'
+import { codeToHtml } from 'shiki'
 
 // Mock shiki
 vi.mock('shiki', () => ({
@@ -49,11 +50,55 @@ describe('MarkdownPreview', () => {
 
     // Check if CodeBlock toolbar is present
     expect(screen.getByText('js')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy code' })).toBeInTheDocument()
     
     // Check if highlighted content eventually appears
     const highlight = await screen.findByText('console.log("hello");')
     expect(highlight).toBeInTheDocument()
+  })
+
+  it('shows copied feedback after copying a code block', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const markdown = '```ts\ntype CopyTarget = {}\n```'
+    render(<MarkdownPreview markdown={markdown} theme="github-light" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy code' }))
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('type CopyTarget = {}')
+    })
+    expect(await screen.findByText('Copied!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Code copied' })).toBeInTheDocument()
+  })
+
+  it('uses GitHub dark syntax highlighting for GitHub dark theme', async () => {
+    const markdown = '```ts\ntype MarkdownDocument = {}\n```'
+    render(<MarkdownPreview markdown={markdown} theme="github-dark" />)
+
+    await screen.findByText('type MarkdownDocument = {}')
+    expect(codeToHtml).toHaveBeenCalledWith(
+      'type MarkdownDocument = {}',
+      expect.objectContaining({
+        lang: 'ts',
+        theme: 'github-dark-default',
+      }),
+    )
+  })
+
+  it('keeps token classes when Shiki highlighting falls back', async () => {
+    vi.mocked(codeToHtml).mockRejectedValueOnce(new Error('Highlight failed'))
+    const markdown = '```ts\ntype BrowserFallback = { ok: boolean }\n```'
+    render(<MarkdownPreview markdown={markdown} theme="github-dark" />)
+
+    await screen.findByText('BrowserFallback')
+    expect(document.querySelector('.code-fallback-highlight')).toBeInTheDocument()
+    expect(document.querySelector('.code-token.keyword')).toHaveTextContent('type')
+    expect(document.querySelector('.code-token.primitive')).toHaveTextContent('boolean')
   })
 
   it('routes mermaid blocks through MermaidBlock renderer', async () => {
