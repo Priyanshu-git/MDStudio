@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -12,6 +12,8 @@ import {
   GitBranch,
   Cloud,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Heading1,
   Heading2,
   HardDrive,
@@ -19,6 +21,7 @@ import {
   Italic,
   Link,
   List,
+  ListTree,
   ListOrdered,
   LogIn,
   Minus,
@@ -213,6 +216,7 @@ export function EditorShellPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false)
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
+  const [isOutlineCollapsed, setIsOutlineCollapsed] = useState(false)
   const [pendingDraftTransition, setPendingDraftTransition] = useState<PendingDraftTransition | null>(null)
   const [isResolvingDraftTransition, setIsResolvingDraftTransition] = useState(false)
 
@@ -261,6 +265,10 @@ export function EditorShellPage() {
   const isMobileViewport = useIsMobileViewport()
   const relativeTimeNow = useRelativeTimeNow()
   const showSidebar = true
+  const titleInputStyle = useMemo(
+    () => ({ '--title-input-ch': `${Math.max(draftTitle.length, 1)}ch` }) as CSSProperties,
+    [draftTitle.length],
+  )
   const normalizedDesktopViewMode: DesktopViewMode = desktopViewMode === 'preview' ? 'preview' : 'split'
   const showEditor = normalizedDesktopViewMode === 'split'
   const showPreview = normalizedDesktopViewMode === 'preview' || normalizedDesktopViewMode === 'split'
@@ -837,6 +845,7 @@ export function EditorShellPage() {
         <input
           className="title-input"
           value={draftTitle}
+          style={titleInputStyle}
           onChange={(event) => setDraftTitle(event.target.value)}
           aria-label="Document title"
         />
@@ -985,10 +994,47 @@ export function EditorShellPage() {
       {saveError ? <div className="studio-banner error">{saveError}</div> : null}
       {importError ? <div className="studio-banner error">{importError}</div> : null}
 
-      <section className="studio-workspace">
+      <section className={isOutlineCollapsed ? 'studio-workspace outline-collapsed' : 'studio-workspace'}>
         {showSidebar ? (
-          <aside className="desktop-sidebar">
-            <Outline outline={outline} onSelect={handleOutlineSelect} />
+          <aside
+            id="editor-outline-sidebar"
+            className={isOutlineCollapsed ? 'desktop-sidebar collapsed' : 'desktop-sidebar'}
+          >
+            {isOutlineCollapsed ? (
+              <button
+                type="button"
+                className="outline-rail-tab outline-rail-tab-collapsed"
+                aria-label="Expand outline"
+                aria-controls="editor-outline-sidebar"
+                aria-expanded="false"
+                title="Expand outline"
+                onClick={() => setIsOutlineCollapsed(false)}
+              >
+                <ListTree size={17} />
+                <span>Outline</span>
+                <ChevronRight size={15} />
+              </button>
+            ) : (
+              <>
+                <div className="desktop-outline-header">
+                  <h2>Outline</h2>
+                  <button
+                    type="button"
+                    className="outline-rail-tab outline-rail-tab-compact"
+                    aria-label="Collapse outline"
+                    aria-controls="editor-outline-sidebar"
+                    aria-expanded="true"
+                    title="Collapse outline"
+                    onClick={() => setIsOutlineCollapsed(true)}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                </div>
+                <div className="desktop-outline-content">
+                  <Outline outline={outline} hideTitle onSelect={handleOutlineSelect} />
+                </div>
+              </>
+            )}
           </aside>
         ) : null}
 

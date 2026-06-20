@@ -1,17 +1,19 @@
 import type { OutlineItem } from './outlineModel'
 
 export function Outline({
+  hideTitle = false,
   outline,
   mobile = false,
   onSelect,
 }: {
+  hideTitle?: boolean
   outline: OutlineItem[]
   mobile?: boolean
   onSelect: (item: OutlineItem) => void
 }) {
   return (
     <section className={mobile ? 'outline-panel mobile' : 'sidebar-section outline-panel'}>
-      <h2>Outline</h2>
+      {hideTitle ? null : <h2>Outline</h2>}
       {outline.length ? (
         <div className="outline-list">
           {outline.map((item) => (

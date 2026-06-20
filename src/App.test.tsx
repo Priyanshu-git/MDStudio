@@ -811,6 +811,8 @@ describe('App routing shell', () => {
     )
 
     const sidebar = container.querySelector<HTMLElement>('.desktop-sidebar')!
+    expect(container.querySelector('.studio-workspace')).not.toHaveClass('outline-collapsed')
+    expect(within(sidebar).getByRole('button', { name: 'Collapse outline' })).toHaveAttribute('aria-expanded', 'true')
     expect(within(sidebar).getByRole('heading', { name: 'Outline' })).toBeInTheDocument()
     expect(within(sidebar).getByRole('button', { name: /What you can create/ })).toBeInTheDocument()
     expect(within(sidebar).queryByRole('button', { name: 'Documents' })).not.toBeInTheDocument()
@@ -818,6 +820,30 @@ describe('App routing shell', () => {
     expect(within(sidebar).queryByRole('button', { name: 'New' })).not.toBeInTheDocument()
     expect(within(sidebar).queryByRole('button', { name: 'Import .md' })).not.toBeInTheDocument()
     expect(sidebar.querySelector('.sidebar-tabs')).not.toBeInTheDocument()
+  })
+
+  it('collapses and expands the desktop outline pane', () => {
+    window.history.pushState({}, '', '/editor')
+    const { container } = render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
+    )
+
+    const workspace = container.querySelector<HTMLElement>('.studio-workspace')!
+    const sidebar = container.querySelector<HTMLElement>('.desktop-sidebar')!
+
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Collapse outline' }))
+
+    expect(workspace).toHaveClass('outline-collapsed')
+    expect(within(sidebar).getByRole('button', { name: 'Expand outline' })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(sidebar).queryByRole('button', { name: /What you can create/ })).not.toBeInTheDocument()
+
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Expand outline' }))
+
+    expect(workspace).not.toHaveClass('outline-collapsed')
+    expect(within(sidebar).getByRole('button', { name: 'Collapse outline' })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(sidebar).getByRole('button', { name: /What you can create/ })).toBeInTheDocument()
   })
 
   it('loads a launched markdown file into the editor route', async () => {
