@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MarkdownPreview } from './MarkdownPreview'
 import { codeToHtml } from 'shiki'
+import mermaid from 'mermaid'
 
 // Mock shiki
 vi.mock('shiki', () => ({
@@ -12,11 +13,15 @@ vi.mock('shiki', () => ({
 vi.mock('mermaid', () => ({
   default: {
     initialize: vi.fn(),
-    render: vi.fn(async (id) => ({ svg: `<svg id="${id}">Diagram</svg>` })),
+    render: vi.fn(async (id) => ({ svg: `<svg id="${id}" viewBox="0 0 100 50">Diagram</svg>` })),
   },
 }))
 
 describe('MarkdownPreview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders standard markdown elements', () => {
     const markdown = '# Heading 1\n\n- List item 1\n- List item 2\n\n**Bold text**'
     render(<MarkdownPreview markdown={markdown} theme="github-light" />)
@@ -106,11 +111,100 @@ describe('MarkdownPreview', () => {
     render(<MarkdownPreview markdown={markdown} theme="github-light" />)
 
     expect(screen.getByText('mermaid')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'SVG' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'PNG' })).toBeInTheDocument()
+    const downloadButton = screen.getByRole('button', { name: 'Download diagram' })
+    expect(downloadButton).toBeDisabled()
 
     const diagram = await screen.findByText('Diagram')
     expect(diagram).toBeInTheDocument()
+    expect(downloadButton).toBeEnabled()
+    expect(mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      htmlLabels: false,
+      flowchart: {
+        htmlLabels: false,
+      },
+    }))
+  })
+
+  it('opens mermaid download menu with SVG and PNG actions', async () => {
+    const markdown = '```mermaid\ngraph TD\nA-->B\n```'
+    render(<MarkdownPreview markdown={markdown} theme="github-light" />)
+
+    await screen.findByText('Diagram')
+    fireEvent.click(screen.getByRole('button', { name: 'Download diagram' }))
+
+    expect(screen.getByRole('menu', { name: 'Diagram download options' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'SVG' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'PNG' })).toBeInTheDocument()
+  })
+
+  it('exports mermaid PNG from viewBox dimensions at 3x scale', async () => {
+    const originalImage = globalThis.Image
+    const originalCreateObjectUrl = URL.createObjectURL
+    const originalRevokeObjectUrl = URL.revokeObjectURL
+    const originalCreateElement = document.createElement.bind(document)
+    const canvas = originalCreateElement('canvas') as HTMLCanvasElement
+    const context = {
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D
+    const pngBlob = new Blob(['png'], { type: 'image/png' })
+    const anchorClicks: string[] = []
+
+    vi.spyOn(canvas, 'getContext').mockReturnValue(context)
+    vi.spyOn(canvas, 'toBlob').mockImplementation((callback) => {
+      callback(pngBlob)
+    })
+    vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      if (tagName.toLowerCase() === 'canvas') {
+        return canvas
+      }
+      const element = originalCreateElement(tagName, options)
+      if (tagName.toLowerCase() === 'a') {
+        vi.spyOn(element as HTMLAnchorElement, 'click').mockImplementation(() => {
+          anchorClicks.push((element as HTMLAnchorElement).download)
+        })
+      }
+      return element
+    })
+
+    URL.createObjectURL = vi
+      .fn()
+      .mockReturnValueOnce('blob:svg')
+      .mockReturnValueOnce('blob:png')
+    URL.revokeObjectURL = vi.fn()
+    Object.defineProperty(globalThis, 'Image', {
+      configurable: true,
+      value: class MockImage {
+        onload: (() => void) | null = null
+        onerror: (() => void) | null = null
+
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.())
+        }
+      },
+    })
+
+    try {
+      const markdown = '```mermaid\ngraph TD\nA-->B\n```'
+      render(<MarkdownPreview markdown={markdown} theme="github-light" />)
+
+      await screen.findByText('Diagram')
+      fireEvent.click(screen.getByRole('button', { name: 'Download diagram' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'PNG' }))
+
+      await waitFor(() => {
+        expect(canvas.width).toBe(300)
+        expect(canvas.height).toBe(150)
+        expect(context.drawImage).toHaveBeenCalledWith(expect.any(Object), 0, 0, 300, 150)
+        expect(anchorClicks).toContain('diagram.png')
+      })
+    } finally {
+      Object.defineProperty(globalThis, 'Image', {
+        configurable: true,
+        value: originalImage,
+      })
+      URL.createObjectURL = originalCreateObjectUrl
+      URL.revokeObjectURL = originalRevokeObjectUrl
+    }
   })
 
   it('renders tables correctly', () => {

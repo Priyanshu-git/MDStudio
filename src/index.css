@@ -1527,6 +1527,16 @@ a {
   background: var(--hover-bg);
 }
 
+.code-copy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.code-copy-button:disabled:hover {
+  color: var(--muted);
+  background: transparent;
+}
+
 .code-copy-button.copied {
   color: #22c55e;
   background: color-mix(in srgb, #22c55e 12%, transparent);
@@ -1540,6 +1550,54 @@ a {
 .toolbar-actions {
   display: flex;
   gap: 8px;
+}
+
+.mermaid-download-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.mermaid-download-trigger[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 54%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.mermaid-download-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 35;
+  min-width: 128px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.mermaid-download-popover button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+}
+
+.mermaid-download-popover button:hover,
+.mermaid-download-popover button:focus-visible {
+  background: var(--hover-bg);
+  outline: none;
 }
 
 .code-content {
